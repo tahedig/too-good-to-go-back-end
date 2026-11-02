@@ -62,10 +62,74 @@ go build -ldflags "-X main.version=v0.1.0" -o bin/api ./cmd/api
 | `HTTP_SHUTDOWN_TIMEOUT` | `10s` | Grace period for in-flight requests on SIGINT/SIGTERM |
 | `HEALTH_CHECK_TIMEOUT` | `2s` | Timeout per dependency check in `/health` |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
+| `HTTP_MAX_BODY_BYTES` | `1048576` | Max request body size (1 KiB to 64 MiB); larger bodies get `413` |
+| `OTP_LENGTH` | `6` | Digits in an OTP (4-8) |
+| `OTP_TTL` | `5m` | OTP lifetime |
+| `OTP_MAX_ATTEMPTS` | `5` | Verification attempts per OTP (1-20) |
+| `OTP_RESEND_COOLDOWN` | `1m` | Minimum time between two codes for the same phone |
+| `OTP_EXPOSE_CODE` | `false` | Return the code as `debug_code` in the request response, for testing while SMS is faked. **Refused** when `APP_ENV=production` |
+| `SMS_PROVIDER` | `fake` | SMS provider; only the sandbox `fake` exists. Outside production it logs the SMS body at debug level |
+| `AUTH_RATE_LIMIT` | `20` | Requests per client IP per window on `/auth/otp/*` |
+| `AUTH_RATE_WINDOW` | `1m` | Window for `AUTH_RATE_LIMIT` |
+| `REDIS_URL` | (none) | `redis://[:password@]host:port/db` (`rediss://` for TLS). Stores OTPs and rate-limit counters. **Required** when `APP_ENV` is not `development`; unset in development falls back to process memory |
+| `REDIS_KEY_PREFIX` | `tgtg:` | Prefix for every Redis key, so environments can share one Redis |
 | `TRUSTED_PROXIES` | (none) | Comma separated proxy IPs/CIDRs for `X-Forwarded-For` |
 
 No secret or environment specific value is committed: `.env` is git-ignored and
 only `.env.example` (placeholders and defaults) is tracked.
+
+## OTP authentication
+
+Login is passwordless: the client requests a one-time code by SMS, then
+verifies it.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/auth/otp/request` | none | `{"phone": "09123456789"}` sends a code. Iranian local, `98...` and E.164 formats are accepted |
+| `POST` | `/auth/otp/verify` | none | `{"phone": "...", "code": "123456"}` checks and consumes the code, returns `{"verified": true, "phone": "+98..."}` |
+
+Error codes clients should handle:
+
+| Status | `code` | Meaning |
+|---|---|---|
+| 400 | `INVALID_PHONE_NUMBER` | Phone cannot be parsed |
+| 400 | `BAD_REQUEST` | Body is not JSON, or the code has the wrong length or non-digits (does **not** use up an attempt) |
+| 400 | `OTP_INVALID` | Wrong code; `details.remaining_attempts` says how many tries are left |
+| 400 | `OTP_EXPIRED` | Code expired, already used, or never requested |
+| 429 | `OTP_ATTEMPTS_EXCEEDED` | Too many wrong codes; request a new one |
+| 429 | `OTP_RESEND_TOO_SOON` | New code requested within `OTP_RESEND_COOLDOWN` |
+| 429 | `TOO_MANY_REQUESTS` | Per-IP limit on `/auth/otp/*` hit |
+| 413 | `PAYLOAD_TOO_LARGE` | Body larger than `HTTP_MAX_BODY_BYTES` |
+
+Every `429` carries a `Retry-After` header (seconds) and
+`details.retry_after_seconds`.
+
+Abuse protection: OTPs are stored only as salted hashes, attempts are counted
+atomically before comparing, codes are single use, and SMS sending is limited
+per phone (cooldown) and per IP (rate limit). The rate limiter keys on the
+client IP, so set `TRUSTED_PROXIES` correctly behind a reverse proxy. If Redis
+is unreachable the rate limiter lets requests through (and logs an error)
+rather than blocking all logins; OTP operations fail with 500.
+
+**Storage.** With `REDIS_URL` set, OTPs and rate-limit counters live in Redis
+and are shared by every instance:
+
+| Key | Type | TTL |
+|---|---|---|
+| `<prefix>otp:<phone>` | hash: `code_hash`, `salt`, `created_at`, `expires_at` (Unix ms), `attempts`, `used` | `max(OTP_TTL, OTP_RESEND_COOLDOWN)` |
+| `<prefix>ratelimit:auth:<ip>` | counter | `AUTH_RATE_WINDOW` |
+
+Every write is a Lua script, so cooldown, attempt counting and single use stay
+atomic across instances. Scripts only use commands from Redis 2.6+, so any
+Redis version works. Redis is pinged at startup (a wrong `REDIS_URL` stops the
+server) and is reported in `/health` as `checks.redis`.
+
+**SMS delivery** is a sandbox for now (`SMS_PROVIDER=fake`): nothing leaves the
+server. To test the flow, either set `LOG_LEVEL=debug` and read the code from
+the `fake sms sent` log line, or set `OTP_EXPOSE_CODE=true` and read
+`debug_code` from the `/auth/otp/request` response. A real provider only needs
+to implement `serviceinterface.SMSSender` in `internal/infrastructure/sms` and
+be added to `newSMSSender` in `internal/injector`.
 
 ## Health endpoint
 
