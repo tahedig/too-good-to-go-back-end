@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	serviceinterface "github.com/tahedig/too-good-to-go/backend/internal/application/service/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/bootstrap"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/enum"
 	handlerinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/handler/interface"
@@ -16,6 +17,7 @@ import (
 // Handlers groups every HTTP handler. Add new feature handlers here.
 type Handlers struct {
 	Health    handlerinterface.HealthHandler
+	Auth      handlerinterface.AuthHandler
 	Protected handlerinterface.ProtectedHandler
 }
 
@@ -24,6 +26,7 @@ func New(
 	log *slog.Logger,
 	errHandler middlewareinterface.ErrorHandler,
 	authMW middlewareinterface.AuthMiddleware,
+	limiter serviceinterface.RateLimiter,
 	h Handlers,
 ) (*gin.Engine, error) {
 	// Release mode always: gin's debug output is plain text and would break
@@ -43,12 +46,27 @@ func New(
 		middleware.RequestLogger(log),
 		errHandler.Recover(),
 		errHandler.Handle(),
+		middleware.SecurityHeaders(),
 	)
+	// Zero values (e.g. a bare Config in tests) disable the limits; LoadConfig
+	// always fills safe defaults.
+	if cfg.HTTPMaxBodyBytes > 0 {
+		r.Use(middleware.BodyLimit(cfg.HTTPMaxBodyBytes))
+	}
 	r.NoRoute(errHandler.NotFound())
 	r.NoMethod(errHandler.MethodNotAllowed())
 
 	r.GET(bootstrap.HealthPath, h.Health.Health)
 	r.HEAD(bootstrap.HealthPath, h.Health.Health)
+
+	auth := r.Group("/auth/otp")
+	if limiter != nil && cfg.AuthRateLimit > 0 && cfg.AuthRateWindow > 0 {
+		// These endpoints send SMS and accept guesses, so they are the
+		// first target for abuse.
+		auth.Use(middleware.RateLimit(limiter, "auth", cfg.AuthRateLimit, cfg.AuthRateWindow, log))
+	}
+	auth.POST("/request", h.Auth.RequestOTP)
+	auth.POST("/verify", h.Auth.VerifyOTP)
 
 	r.GET("/auth/me", authMW.Authenticate(), h.Protected.Me)
 

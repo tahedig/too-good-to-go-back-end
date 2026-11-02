@@ -21,10 +21,11 @@ func TestInitializeAppProtectsRoutes(t *testing.T) {
 		JWTIssuer:          "test",
 		JWTAccessTTL:       time.Hour,
 	}
-	app, err := InitializeApp(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), "test")
+	app, cleanup, err := InitializeApp(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), "test")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cleanup()
 
 	for path, want := range map[string]int{"/health": http.StatusOK, "/auth/me": http.StatusUnauthorized, "/test/admin": http.StatusUnauthorized} {
 		w := httptest.NewRecorder()

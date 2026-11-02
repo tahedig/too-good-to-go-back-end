@@ -14,4 +14,6 @@ const (
 	CtxKeyUserRole  = "user_role"
 
 	HealthPath = "/health"
+
+	SMSProviderFake = "fake"
 )

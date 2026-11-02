@@ -47,8 +47,9 @@ func newRBACEnv(t *testing.T) *rbacEnv {
 		map[string]enum.Role{rbacVendorPhone: enum.RoleVendor, rbacAdminPhone: enum.RoleAdmin}, log)
 	health := service.NewHealthService("test", time.Second, log)
 
-	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), middleware.NewAuthMiddleware(tokens), router.Handlers{
+	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), middleware.NewAuthMiddleware(tokens), nil, router.Handlers{
 		Health:    handler.NewHealthHandler(health),
+		Auth:      handler.NewAuthHandler(nil),
 		Protected: handler.NewProtectedHandler(),
 	})
 	if err != nil {

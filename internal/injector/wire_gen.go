@@ -16,18 +16,31 @@ import (
 
 // Injectors from wire.go:
 
-func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*App, error) {
+// InitializeApp builds the whole application. The returned cleanup releases
+// external connections (Redis) and must run after the HTTP server stopped.
+func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*App, func(), error) {
 	errorHandler := middleware.NewErrorHandler(log)
 	tokenManager := provideTokenManager(cfg)
 	authMiddleware := middleware.NewAuthMiddleware(tokenManager)
-	healthService := provideHealthService(cfg, log, version)
-	healthHandler := handler.NewHealthHandler(healthService)
-	protectedHandler := handler.NewProtectedHandler()
-	handlers := provideHandlers(healthHandler, protectedHandler)
-	engine, err := router.New(cfg, log, errorHandler, authMiddleware, handlers)
+	injectorStorage, cleanup, err := provideStorage(cfg, log)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	rateLimiter := provideRateLimiter(injectorStorage)
+	healthService := provideHealthService(cfg, log, version, injectorStorage)
+	healthHandler := handler.NewHealthHandler(healthService)
+	smsSender := provideSMSSender(cfg, log)
+	authService := provideAuthService(cfg, log, injectorStorage, smsSender)
+	authHandler := handler.NewAuthHandler(authService)
+	protectedHandler := handler.NewProtectedHandler()
+	handlers := provideHandlers(healthHandler, authHandler, protectedHandler)
+	engine, err := router.New(cfg, log, errorHandler, authMiddleware, rateLimiter, handlers)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
 	}
 	app := newApp(engine, healthService)
-	return app, nil
+	return app, func() {
+		cleanup()
+	}, nil
 }

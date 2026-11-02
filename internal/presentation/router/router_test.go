@@ -32,9 +32,10 @@ func newTestRouter(t *testing.T, logs *bytes.Buffer, checkers ...serviceinterfac
 	t.Helper()
 	log := logger.New("debug", logs)
 	svc := service.NewHealthService("test", time.Second, log, checkers...)
-	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), middleware.NewAuthMiddleware(nil),
+	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), middleware.NewAuthMiddleware(nil), nil,
 		router.Handlers{
 			Health:    handler.NewHealthHandler(svc),
+			Auth:      handler.NewAuthHandler(nil),
 			Protected: handler.NewProtectedHandler(),
 		})
 	if err != nil {
