@@ -6,6 +6,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	_ "github.com/tahedig/too-good-to-go/backend/docs"
+
 	serviceinterface "github.com/tahedig/too-good-to-go/backend/internal/application/service/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/bootstrap"
 	handlerinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/handler/interface"
@@ -55,6 +59,7 @@ func New(
 
 	r.GET(bootstrap.HealthPath, h.Health.Health)
 	r.HEAD(bootstrap.HealthPath, h.Health.Health)
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	auth := r.Group("/auth/otp")
 	if limiter != nil && cfg.AuthRateLimit > 0 && cfg.AuthRateWindow > 0 {

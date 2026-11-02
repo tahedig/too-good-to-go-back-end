@@ -1,0 +1,177 @@
+basePath: /
+definitions:
+  dto.ErrorBody:
+    properties:
+      code:
+        type: string
+      details: {}
+      message:
+        type: string
+      request_id:
+        type: string
+    type: object
+  dto.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/dto.ErrorBody'
+    type: object
+  dto.HealthCheckResult:
+    properties:
+      latency_ms:
+        type: integer
+      status:
+        type: string
+    type: object
+  dto.HealthResponse:
+    properties:
+      checks:
+        additionalProperties:
+          $ref: '#/definitions/dto.HealthCheckResult'
+        type: object
+      status:
+        type: string
+      timestamp:
+        type: string
+      version:
+        type: string
+    type: object
+  dto.RequestOTPRequest:
+    properties:
+      phone:
+        description: Iranian local (09...), 98... or E.164 (+...) format.
+        example: "09123456789"
+        type: string
+    type: object
+  dto.RequestOTPResponse:
+    properties:
+      debug_code:
+        description: DebugCode is present only when OTP_EXPOSE_CODE=true (never in
+          production).
+        example: "123456"
+        type: string
+      expires_in_seconds:
+        example: 300
+        type: integer
+      message:
+        example: verification code sent
+        type: string
+    type: object
+  dto.VerifyOTPRequest:
+    properties:
+      code:
+        example: "123456"
+        type: string
+      phone:
+        example: "09123456789"
+        type: string
+    type: object
+  dto.VerifyOTPResponse:
+    properties:
+      phone:
+        example: "+989123456789"
+        type: string
+      verified:
+        example: true
+        type: boolean
+    type: object
+info:
+  contact: {}
+  description: REST API for the Too Good To Go application.
+  title: Too Good To Go API
+  version: "1.0"
+paths:
+  /auth/otp/request:
+    post:
+      consumes:
+      - application/json
+      description: Sends an OTP by SMS to the phone number. The code is never returned,
+        except as debug_code when OTP_EXPOSE_CODE is enabled outside production.
+      parameters:
+      - description: Phone number
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RequestOTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.RequestOTPResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: OTP_RESEND_TOO_SOON or TOO_MANY_REQUESTS; see Retry-After
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Request a one-time password
+      tags:
+      - auth
+  /auth/otp/verify:
+    post:
+      consumes:
+      - application/json
+      description: Checks the code and consumes it on success. A malformed code is
+        rejected without using up an attempt.
+      parameters:
+      - description: Phone number and code
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.VerifyOTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VerifyOTPResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: OTP_ATTEMPTS_EXCEEDED or TOO_MANY_REQUESTS
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Verify a one-time password
+      tags:
+      - auth
+  /health:
+    get:
+      description: 200 when the service and all its dependencies are healthy, 503
+        otherwise (including during shutdown).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.HealthResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.HealthResponse'
+      summary: Service health
+      tags:
+      - system
+securityDefinitions:
+  BearerAuth:
+    description: 'Enter your JWT as: Bearer <token>'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
