@@ -8,5 +8,5 @@ scrape_configs:
       - targets:
           - "node-exporter:9100"
         labels:
-          environment: "staging"
-          server: "staging-server"
+          environment: "local"
+          server: "docker-desktop-local"

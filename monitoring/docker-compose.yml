@@ -1,6 +1,6 @@
 services:
   prometheus:
-    image: prom/prometheus:v3.15.1
+    image: quay.io/prometheus/prometheus:v3.15.1
     container_name: staging-prometheus
     restart: unless-stopped
     command:
@@ -16,7 +16,7 @@ services:
       - monitoring
 
   node-exporter:
-    image: prom/node-exporter:v1.12.1
+    image: quay.io/prometheus/node-exporter:v1.12.1
     container_name: staging-node-exporter
     restart: unless-stopped
     pid: host
@@ -28,14 +28,14 @@ services:
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-      - /:/host:ro,rslave
+      - /:/host:ro
     expose:
       - "9100"
     networks:
       - monitoring
 
   grafana:
-    image: grafana/grafana-oss:13.3.0
+    image: grafana/grafana:13.3.0
     container_name: staging-grafana
     restart: unless-stopped
     depends_on:
