@@ -8,6 +8,7 @@ import (
 
 	serviceinterface "github.com/tahedig/too-good-to-go/backend/internal/application/service/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/bootstrap"
+	"github.com/tahedig/too-good-to-go/backend/internal/domain/enum"
 	handlerinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/handler/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware"
 	middlewareinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware/interface"
@@ -15,14 +16,16 @@ import (
 
 // Handlers groups every HTTP handler. Add new feature handlers here.
 type Handlers struct {
-	Health handlerinterface.HealthHandler
-	Auth   handlerinterface.AuthHandler
+	Health    handlerinterface.HealthHandler
+	Auth      handlerinterface.AuthHandler
+	Protected handlerinterface.ProtectedHandler
 }
 
 func New(
 	cfg *bootstrap.Config,
 	log *slog.Logger,
 	errHandler middlewareinterface.ErrorHandler,
+	authMW middlewareinterface.AuthMiddleware,
 	limiter serviceinterface.RateLimiter,
 	h Handlers,
 ) (*gin.Engine, error) {
@@ -64,6 +67,14 @@ func New(
 	}
 	auth.POST("/request", h.Auth.RequestOTP)
 	auth.POST("/verify", h.Auth.VerifyOTP)
+
+	r.GET("/auth/me", authMW.Authenticate(), h.Protected.Me)
+
+	// Test routes, one per role, to exercise RBAC.
+	test := r.Group("/test", authMW.Authenticate())
+	test.GET("/customer", authMW.RequireRoles(enum.RoleCustomer), h.Protected.CustomerArea)
+	test.GET("/vendor", authMW.RequireRoles(enum.RoleVendor), h.Protected.VendorArea)
+	test.GET("/admin", authMW.RequireRoles(enum.RoleAdmin), h.Protected.AdminArea)
 
 	return r, nil
 }

@@ -20,6 +20,8 @@ import (
 // external connections (Redis) and must run after the HTTP server stopped.
 func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*App, func(), error) {
 	errorHandler := middleware.NewErrorHandler(log)
+	tokenManager := provideTokenManager(cfg)
+	authMiddleware := middleware.NewAuthMiddleware(tokenManager)
 	injectorStorage, cleanup, err := provideStorage(cfg, log)
 	if err != nil {
 		return nil, nil, err
@@ -30,8 +32,9 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 	smsSender := provideSMSSender(cfg, log)
 	authService := provideAuthService(cfg, log, injectorStorage, smsSender)
 	authHandler := handler.NewAuthHandler(authService)
-	handlers := provideHandlers(healthHandler, authHandler)
-	engine, err := router.New(cfg, log, errorHandler, rateLimiter, handlers)
+	protectedHandler := handler.NewProtectedHandler()
+	handlers := provideHandlers(healthHandler, authHandler, protectedHandler)
+	engine, err := router.New(cfg, log, errorHandler, authMiddleware, rateLimiter, handlers)
 	if err != nil {
 		cleanup()
 		return nil, nil, err

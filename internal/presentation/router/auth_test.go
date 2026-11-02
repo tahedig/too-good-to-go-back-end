@@ -56,9 +56,10 @@ func newAuthEnvWithStores(t *testing.T, cfg *bootstrap.Config, otpCfg service.OT
 	auth := service.NewAuthService(otps, sender, otpCfg, log)
 	health := service.NewHealthService("test", time.Second, log)
 
-	r, err := router.New(cfg, log, middleware.NewErrorHandler(log), limiter, router.Handlers{
-		Health: handler.NewHealthHandler(health),
-		Auth:   handler.NewAuthHandler(auth),
+	r, err := router.New(cfg, log, middleware.NewErrorHandler(log), middleware.NewAuthMiddleware(nil), limiter, router.Handlers{
+		Health:    handler.NewHealthHandler(health),
+		Auth:      handler.NewAuthHandler(auth),
+		Protected: handler.NewProtectedHandler(),
 	})
 	if err != nil {
 		t.Fatal(err)

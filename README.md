@@ -73,6 +73,11 @@ go build -ldflags "-X main.version=v0.1.0" -o bin/api ./cmd/api
 | `AUTH_RATE_WINDOW` | `1m` | Window for `AUTH_RATE_LIMIT` |
 | `REDIS_URL` | (none) | `redis://[:password@]host:port/db` (`rediss://` for TLS). Stores OTPs and rate-limit counters. **Required** when `APP_ENV` is not `development`; unset in development falls back to process memory |
 | `REDIS_KEY_PREFIX` | `tgtg:` | Prefix for every Redis key, so environments can share one Redis |
+| `JWT_SECRET` | (random in development) | HS256 signing secret, min 32 chars. **Required** when `APP_ENV` is not `development`; unset in development generates a random one per start |
+| `JWT_ISSUER` | `too-good-to-go-backend` | `iss` claim, checked on every request |
+| `JWT_ACCESS_TTL` | `1h` | Access token lifetime |
+| `ADMIN_PHONES` | (none) | Comma separated phones that become `admin` on first login |
+| `VENDOR_PHONES` | (none) | Comma separated phones that become `vendor` on first login |
 | `TRUSTED_PROXIES` | (none) | Comma separated proxy IPs/CIDRs for `X-Forwarded-For` |
 
 No secret or environment specific value is committed: `.env` is git-ignored and
@@ -153,6 +158,37 @@ be added to `newSMSSender` in `internal/injector`.
 `serviceinterface.HealthChecker` (`Name()`, `Check(ctx)`) in the infrastructure
 layer and pass it to `service.NewHealthService` in `internal/injector`.
 Failure reasons are logged, never returned, because `/health` is public.
+
+## Authentication and RBAC (JWT)
+
+Protected routes require an HS256 access token:
+`Authorization: Bearer <access_token>`.
+
+| Method | Path | Access | Description |
+|---|---|---|---|
+| `GET` | `/auth/me` | any role | User id and role proven by the token |
+| `GET` | `/test/customer` | `customer` | RBAC test route |
+| `GET` | `/test/vendor` | `vendor` | RBAC test route |
+| `GET` | `/test/admin` | `admin` | RBAC test route |
+
+A missing, malformed, expired or wrongly signed token, a wrong issuer or
+algorithm, or an unknown role gets `401 UNAUTHORIZED`; a valid token with the
+wrong role gets `403 FORBIDDEN`.
+
+Tokens are issued by `SessionService.Login` for a phone number that was
+already verified by another factor (OTP). It loads or creates the user (users
+are kept in memory until the Postgres repository exists); new users are
+`customer` unless their number is in `ADMIN_PHONES` / `VENDOR_PHONES`. Roles of
+existing users are never changed on login.
+
+To protect a new route:
+
+```go
+group := r.Group("/vendor", authMW.Authenticate(), authMW.RequireRoles(enum.RoleVendor))
+```
+
+Handlers read the caller with `c.GetString(bootstrap.CtxKeyUserID)` and
+`c.GetString(bootstrap.CtxKeyUserRole)`.
 
 ## Error response format
 

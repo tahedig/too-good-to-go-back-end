@@ -24,12 +24,15 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 
 		// application
 		provideHealthService,
+		provideTokenManager,
 		provideAuthService,
 
 		// presentation
 		handler.NewHealthHandler,
 		handler.NewAuthHandler,
+		handler.NewProtectedHandler,
 		middleware.NewErrorHandler,
+		middleware.NewAuthMiddleware,
 		provideHandlers,
 		router.New,
 

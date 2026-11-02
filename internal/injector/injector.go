@@ -17,6 +17,7 @@ import (
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/repository/memory"
 	redisrepo "github.com/tahedig/too-good-to-go/backend/internal/infrastructure/repository/redis"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/sms"
+	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/token"
 	handlerinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/handler/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/router"
 )
@@ -24,6 +25,10 @@ import (
 type App struct {
 	Router *gin.Engine
 	Health serviceinterface.HealthService
+}
+
+func provideTokenManager(cfg *bootstrap.Config) serviceinterface.TokenManager {
+	return token.NewJWTManager(cfg.JWTSecret, cfg.JWTIssuer, cfg.JWTAccessTTL)
 }
 
 func newApp(r *gin.Engine, health serviceinterface.HealthService) *App {
@@ -105,6 +110,7 @@ func provideAuthService(
 func provideHandlers(
 	health handlerinterface.HealthHandler,
 	auth handlerinterface.AuthHandler,
+	protected handlerinterface.ProtectedHandler,
 ) router.Handlers {
-	return router.Handlers{Health: health, Auth: auth}
+	return router.Handlers{Health: health, Auth: auth, Protected: protected}
 }
