@@ -3,6 +3,8 @@
 // handlers never build error bodies themselves.
 package exception
 
+import "time"
+
 // AppError is an error that knows how it should be presented to a client.
 type AppError interface {
 	error
@@ -17,11 +19,12 @@ type AppError interface {
 }
 
 type appError struct {
-	status  int
-	code    string
-	message string
-	details any
-	cause   error
+	status     int
+	code       string
+	message    string
+	details    any
+	cause      error
+	retryAfter time.Duration
 }
 
 func (e *appError) Error() string {
@@ -36,6 +39,15 @@ func (e *appError) Code() string    { return e.code }
 func (e *appError) Message() string { return e.message }
 func (e *appError) Details() any    { return e.details }
 func (e *appError) Unwrap() error   { return e.cause }
+
+// Retryable is implemented by errors that tell the client when it may try
+// again (typically 429). The error middleware turns it into a Retry-After
+// header.
+type Retryable interface {
+	RetryAfter() time.Duration
+}
+
+func (e *appError) RetryAfter() time.Duration { return e.retryAfter }
 
 // FieldError describes one invalid input field inside Details.
 type FieldError struct {

@@ -13,4 +13,6 @@ const (
 	CtxKeyUserID    = "user_id" // set by the JWT middleware once auth exists
 
 	HealthPath = "/health"
+
+	SMSProviderFake = "fake"
 )
