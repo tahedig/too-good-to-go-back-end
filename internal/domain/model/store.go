@@ -59,3 +59,11 @@ type Store struct {
 	UpdatedAt           time.Time
 	DeletedAt           *time.Time
 }
+
+// IsEligibleForPublic returns true if the store can be viewed by public customers.
+func (s *Store) IsEligibleForPublic() bool {
+	if s == nil || s.DeletedAt != nil {
+		return false
+	}
+	return (s.VendorStatus == "approved" || s.VendorStatus == "active") && s.IsActive
+}
