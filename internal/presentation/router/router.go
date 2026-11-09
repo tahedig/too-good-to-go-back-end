@@ -23,6 +23,7 @@ type Handlers struct {
 	Auth         handlerinterface.AuthHandler
 	Store        handlerinterface.StoreHandler
 	StoreRequest handlerinterface.StoreRequestHandler
+	PublicStore  handlerinterface.PublicStoreHandler
 }
 
 func New(
@@ -85,6 +86,11 @@ func New(
 		requests.GET("", h.StoreRequest.ListStoreRequests)
 		requests.GET("/:id", h.StoreRequest.GetStoreRequest)
 		requests.POST("", h.StoreRequest.CreateStoreRequest)
+	}
+
+	if h.PublicStore != nil {
+		r.GET("/stores/:id", h.PublicStore.GetPublicStore)
+		r.HEAD("/stores/:id", h.PublicStore.GetPublicStore)
 	}
 
 	return r, nil

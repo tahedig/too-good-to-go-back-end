@@ -257,3 +257,40 @@ func TestVendorStoreRequestRoutesMounted(t *testing.T) {
 		t.Fatalf("POST /vendor/store-requests: got %d, called %v", w.Code, mock.createCalled)
 	}
 }
+
+type publicStoreHandlerMock struct {
+	getCalled bool
+}
+
+func (m *publicStoreHandlerMock) GetPublicStore(c *gin.Context) {
+	m.getCalled = true
+	c.JSON(http.StatusOK, gin.H{"id": c.Param("id")})
+}
+
+func TestPublicStoreRouteMounted(t *testing.T) {
+	var logs bytes.Buffer
+	log := logger.New("debug", &logs)
+	mock := &publicStoreHandlerMock{}
+
+	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), nil,
+		router.Handlers{
+			Health:      handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
+			Auth:        handler.NewAuthHandler(nil),
+			PublicStore: mock,
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := do(r, http.MethodGet, "/stores/store-123")
+	if w.Code != http.StatusOK || !mock.getCalled {
+		t.Fatalf("GET /stores/:id: got %d, called %v", w.Code, mock.getCalled)
+	}
+
+	mock.getCalled = false
+	w = do(r, http.MethodHead, "/stores/store-123")
+	if w.Code != http.StatusOK || !mock.getCalled {
+		t.Fatalf("HEAD /stores/:id: got %d, called %v", w.Code, mock.getCalled)
+	}
+}
+
