@@ -39,6 +39,14 @@ func (r *storeRepositoryStub) GetByPublicIDAndUser(
 	return r.store, r.err
 }
 
+func (r *storeRepositoryStub) GetPublicByPublicID(
+	_ context.Context,
+	publicID string,
+) (*model.Store, error) {
+	r.publicID = publicID
+	return r.store, r.err
+}
+
 func (r *storeRepositoryStub) Update(
 	_ context.Context,
 	store *model.Store,
