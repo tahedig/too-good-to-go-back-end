@@ -145,6 +145,47 @@ const docTemplate = `{
                 }
             }
         },
+        "/stores/{id}": {
+            "get": {
+                "description": "Returns public store information, schedule, and available food offers for eligible stores. Unknown or unavailable stores return 404 without exposing private fields.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "stores"
+                ],
+                "summary": "Get public store details and available offers",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Store Public ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PublicStoreResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/vendor/store-requests": {
             "get": {
                 "security": [
@@ -532,6 +573,144 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.PublicOfferResponse": {
+            "type": "object",
+            "properties": {
+                "availability_badge": {
+                    "type": "string",
+                    "example": "۳ بسته موجود"
+                },
+                "category_name": {
+                    "type": "string",
+                    "example": "نانوایی"
+                },
+                "currency": {
+                    "type": "string",
+                    "example": "تومان"
+                },
+                "distance_text": {
+                    "type": "string",
+                    "example": "۰٫۶ کیلومتر"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "off-550e8400-e29b-41d4-a716-446655440000"
+                },
+                "image_url": {
+                    "type": "string",
+                    "example": "https://example.com/bread.jpg"
+                },
+                "original_price": {
+                    "type": "integer",
+                    "example": 115000
+                },
+                "pickup_window": {
+                    "type": "string",
+                    "example": "امروز، ۱۸:۰۰-۱۹:۰۰"
+                },
+                "price": {
+                    "type": "integer",
+                    "example": 40000
+                },
+                "quantity_available": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "title": {
+                    "type": "string",
+                    "example": "نان صبحگاهی"
+                }
+            }
+        },
+        "dto.PublicStoreResponse": {
+            "type": "object",
+            "properties": {
+                "biography": {
+                    "type": "string",
+                    "example": "نانوایی محلی با نان‌های تازه و شیرینی‌های پخت روز."
+                },
+                "category_name": {
+                    "type": "string",
+                    "example": "نانوایی"
+                },
+                "city": {
+                    "type": "string",
+                    "example": "تهران"
+                },
+                "cover_image_url": {
+                    "type": "string",
+                    "example": "https://example.com/cover.jpg"
+                },
+                "district": {
+                    "type": "string",
+                    "example": "ولیعصر"
+                },
+                "header_subtitle": {
+                    "type": "string",
+                    "example": "نانوایی · ولیعصر"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "store-550e8400-e29b-41d4-a716-446655440000"
+                },
+                "is_open": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "location": {
+                    "$ref": "#/definitions/dto.StoreLocationResponse"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "نان صبحگاهی"
+                },
+                "offers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.PublicOfferResponse"
+                    }
+                },
+                "pickup_address": {
+                    "type": "string",
+                    "example": "تهران، خیابان ولیعصر، پلاک ۱۲"
+                },
+                "pickup_instructions": {
+                    "type": "string",
+                    "example": "تحویل از پیشخوان نانوایی، ورودی خیابان ولیعصر."
+                },
+                "pickup_summary": {
+                    "type": "string",
+                    "example": "۳ موجود · تحویل امروز ۱۸:۰۰-۱۹:۰۰"
+                },
+                "status_badge": {
+                    "type": "string",
+                    "example": "باز است"
+                },
+                "working_hours_schedule": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.PublicWorkingScheduleItem"
+                    }
+                }
+            }
+        },
+        "dto.PublicWorkingScheduleItem": {
+            "type": "object",
+            "properties": {
+                "days": {
+                    "type": "string",
+                    "example": "یکشنبه تا چهارشنبه"
+                },
+                "hours": {
+                    "type": "string",
+                    "example": "۰۸:۰۰-۱۹:۰۰"
+                },
+                "is_closed": {
+                    "type": "boolean",
+                    "example": false
                 }
             }
         },

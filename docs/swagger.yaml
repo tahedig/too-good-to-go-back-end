@@ -50,6 +50,106 @@ definitions:
       version:
         type: string
     type: object
+  dto.PublicOfferResponse:
+    properties:
+      availability_badge:
+        example: ۳ بسته موجود
+        type: string
+      category_name:
+        example: نانوایی
+        type: string
+      currency:
+        example: تومان
+        type: string
+      distance_text:
+        example: ۰٫۶ کیلومتر
+        type: string
+      id:
+        example: off-550e8400-e29b-41d4-a716-446655440000
+        type: string
+      image_url:
+        example: https://example.com/bread.jpg
+        type: string
+      original_price:
+        example: 115000
+        type: integer
+      pickup_window:
+        example: امروز، ۱۸:۰۰-۱۹:۰۰
+        type: string
+      price:
+        example: 40000
+        type: integer
+      quantity_available:
+        example: 3
+        type: integer
+      title:
+        example: نان صبحگاهی
+        type: string
+    type: object
+  dto.PublicStoreResponse:
+    properties:
+      biography:
+        example: نانوایی محلی با نان‌های تازه و شیرینی‌های پخت روز.
+        type: string
+      category_name:
+        example: نانوایی
+        type: string
+      city:
+        example: تهران
+        type: string
+      cover_image_url:
+        example: https://example.com/cover.jpg
+        type: string
+      district:
+        example: ولیعصر
+        type: string
+      header_subtitle:
+        example: نانوایی · ولیعصر
+        type: string
+      id:
+        example: store-550e8400-e29b-41d4-a716-446655440000
+        type: string
+      is_open:
+        example: true
+        type: boolean
+      location:
+        $ref: '#/definitions/dto.StoreLocationResponse'
+      name:
+        example: نان صبحگاهی
+        type: string
+      offers:
+        items:
+          $ref: '#/definitions/dto.PublicOfferResponse'
+        type: array
+      pickup_address:
+        example: تهران، خیابان ولیعصر، پلاک ۱۲
+        type: string
+      pickup_instructions:
+        example: تحویل از پیشخوان نانوایی، ورودی خیابان ولیعصر.
+        type: string
+      pickup_summary:
+        example: ۳ موجود · تحویل امروز ۱۸:۰۰-۱۹:۰۰
+        type: string
+      status_badge:
+        example: باز است
+        type: string
+      working_hours_schedule:
+        items:
+          $ref: '#/definitions/dto.PublicWorkingScheduleItem'
+        type: array
+    type: object
+  dto.PublicWorkingScheduleItem:
+    properties:
+      days:
+        example: یکشنبه تا چهارشنبه
+        type: string
+      hours:
+        example: ۰۸:۰۰-۱۹:۰۰
+        type: string
+      is_closed:
+        example: false
+        type: boolean
+    type: object
   dto.RequestOTPRequest:
     properties:
       phone:
@@ -372,6 +472,35 @@ paths:
       summary: Service health
       tags:
       - system
+  /stores/{id}:
+    get:
+      description: Returns public store information, schedule, and available food
+        offers for eligible stores. Unknown or unavailable stores return 404 without
+        exposing private fields.
+      parameters:
+      - description: Store Public ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PublicStoreResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Get public store details and available offers
+      tags:
+      - stores
   /vendor/store-requests:
     get:
       consumes:
