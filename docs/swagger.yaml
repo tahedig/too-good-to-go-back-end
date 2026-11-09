@@ -1,5 +1,20 @@
 basePath: /
 definitions:
+  dto.CreateStoreRequestInput:
+    properties:
+      address:
+        example: تهران، خیابان شریعتی
+        type: string
+      category_id:
+        example: 1
+        type: integer
+      owner_name:
+        example: آیدا کریمی
+        type: string
+      store_name:
+        example: نان صبحگاهی - شعبه شریعتی
+        type: string
+    type: object
   dto.ErrorBody:
     properties:
       code:
@@ -56,6 +71,173 @@ definitions:
         example: verification code sent
         type: string
     type: object
+  dto.StoreImageDTO:
+    properties:
+      id:
+        example: img-1
+        type: string
+      is_primary:
+        example: true
+        type: boolean
+      sort_order:
+        example: 1
+        type: integer
+      url:
+        example: https://example.com/store.jpg
+        type: string
+    type: object
+  dto.StoreListResponse:
+    properties:
+      stores:
+        items:
+          $ref: '#/definitions/dto.StoreResponse'
+        type: array
+    type: object
+  dto.StoreLocationResponse:
+    properties:
+      latitude:
+        example: 35.6892
+        type: number
+      longitude:
+        example: 51.389
+        type: number
+    type: object
+  dto.StoreRequestListResponse:
+    properties:
+      requests:
+        items:
+          $ref: '#/definitions/dto.StoreRequestResponse'
+        type: array
+    type: object
+  dto.StoreRequestResponse:
+    properties:
+      address:
+        example: تهران، خیابان شریعتی
+        type: string
+      category_id:
+        example: 1
+        type: integer
+      category_name:
+        example: نانوایی
+        type: string
+      created_at:
+        type: string
+      date:
+        example: ۲۷ مهر ۱۴۰۵
+        type: string
+      notice:
+        example: این شعبه پس از تأیید، امکان انتشار محصول خواهد داشت.
+        type: string
+      owner_name:
+        example: آیدا کریمی
+        type: string
+      public_id:
+        example: req-550e8400-e29b-41d4-a716-446655440000
+        type: string
+      status:
+        example: pending_review
+        type: string
+      status_fa:
+        example: در انتظار بررسی
+        type: string
+      store_name:
+        example: نان صبحگاهی - شعبه شریعتی
+        type: string
+    type: object
+  dto.StoreResponse:
+    properties:
+      active_products_count:
+        example: 1
+        type: integer
+      approval_status:
+        type: string
+      availability_status:
+        type: string
+      biography:
+        example: نانوایی محلی با نان‌های تازه و شیرینی‌های پخت روز.
+        type: string
+      category_id:
+        example: 1
+        type: integer
+      category_name:
+        example: نانوایی
+        type: string
+      closed_days_summary:
+        example: پنج‌شنبه و جمعه تعطیل
+        type: string
+      cover_image_url:
+        type: string
+      created_at:
+        type: string
+      images:
+        items:
+          $ref: '#/definitions/dto.StoreImageDTO'
+        type: array
+      location:
+        $ref: '#/definitions/dto.StoreLocationResponse'
+      name:
+        example: نان صبحگاهی
+        type: string
+      owner_name:
+        example: آیدا کریمی
+        type: string
+      phone:
+        example: "09124550120"
+        type: string
+      pickup_address:
+        example: تهران، خیابان ولیعصر، پلاک ۱۲
+        type: string
+      pickup_instructions:
+        example: تحویل از پیشخوان نانوایی، ورودی خیابان ولیعصر.
+        type: string
+      public_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      rating_avg:
+        type: number
+      trust_score:
+        type: number
+      updated_at:
+        type: string
+      working_hours:
+        items:
+          $ref: '#/definitions/dto.WorkingHourDTO'
+        type: array
+      working_hours_summary:
+        example: شنبه تا چهارشنبه · ۰۸:۰۰ تا ۱۹:۰۰
+        type: string
+    type: object
+  dto.UpdateStoreRequest:
+    properties:
+      biography:
+        example: نانوایی محلی با نان‌های تازه و شیرینی‌های پخت روز.
+        type: string
+      category_id:
+        example: 1
+        type: integer
+      images:
+        items:
+          $ref: '#/definitions/dto.StoreImageDTO'
+        type: array
+      location:
+        $ref: '#/definitions/dto.StoreLocationResponse'
+      name:
+        example: نان صبحگاهی
+        type: string
+      phone:
+        example: "09124550120"
+        type: string
+      pickup_address:
+        example: تهران، خیابان ولیعصر، پلاک ۱۲
+        type: string
+      pickup_instructions:
+        example: تحویل از پیشخوان نانوایی، ورودی خیابان ولیعصر.
+        type: string
+      working_hours:
+        items:
+          $ref: '#/definitions/dto.WorkingHourDTO'
+        type: array
+    type: object
   dto.VerifyOTPRequest:
     properties:
       code:
@@ -73,6 +255,28 @@ definitions:
       verified:
         example: true
         type: boolean
+    type: object
+  dto.WorkingHourDTO:
+    properties:
+      close_time:
+        example: "19:00"
+        type: string
+      day_name:
+        example: saturday
+        type: string
+      day_name_fa:
+        example: شنبه
+        type: string
+      day_of_week:
+        description: 0 = Saturday, 1 = Sunday, ..., 6 = Friday
+        example: 0
+        type: integer
+      is_closed:
+        example: false
+        type: boolean
+      open_time:
+        example: "08:00"
+        type: string
     type: object
 info:
   contact: {}
@@ -168,6 +372,209 @@ paths:
       summary: Service health
       tags:
       - system
+  /vendor/store-requests:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all store creation/branch requests submitted by the authenticated
+        vendor.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.StoreRequestListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List vendor store requests
+      tags:
+      - vendor
+    post:
+      consumes:
+      - application/json
+      description: Submits a request to create a new store or branch.
+      parameters:
+      - description: Store creation request payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateStoreRequestInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.StoreRequestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Submit a new store request
+      tags:
+      - vendor
+  /vendor/store-requests/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves status and details of a store creation request.
+      parameters:
+      - description: Store Request Public ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.StoreRequestResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get store request details
+      tags:
+      - vendor
+  /vendor/stores:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all stores owned by the authenticated vendor.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.StoreListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List vendor stores
+      tags:
+      - vendor
+  /vendor/stores/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves store information for a store owned by the authenticated
+        vendor.
+      parameters:
+      - description: Store Public ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.StoreResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get vendor store details
+      tags:
+      - vendor
+    patch:
+      consumes:
+      - application/json
+      description: Updates editable fields (name, pickup address, category, phone,
+        biography, instructions, working hours, images, location) for a store owned
+        by the authenticated vendor.
+      parameters:
+      - description: Store Public ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Store update payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateStoreRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.StoreResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update vendor store information
+      tags:
+      - vendor
 securityDefinitions:
   BearerAuth:
     description: 'Enter your JWT as: Bearer <token>'

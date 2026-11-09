@@ -146,3 +146,114 @@ func TestIncomingRequestIDIsReusedAndValidated(t *testing.T) {
 		t.Fatalf("invalid incoming id should be replaced, got %q", got)
 	}
 }
+
+type storeHandlerMock struct {
+	listCalled   bool
+	getCalled    bool
+	updateCalled bool
+}
+
+func (m *storeHandlerMock) ListStores(c *gin.Context) {
+	m.listCalled = true
+	c.JSON(http.StatusOK, gin.H{"status": "listed"})
+}
+
+func (m *storeHandlerMock) GetStore(c *gin.Context) {
+	m.getCalled = true
+	c.JSON(http.StatusOK, gin.H{"status": "retrieved", "id": c.Param("id")})
+}
+
+func (m *storeHandlerMock) UpdateStore(c *gin.Context) {
+	m.updateCalled = true
+	c.JSON(http.StatusOK, gin.H{"status": "updated", "id": c.Param("id")})
+}
+
+func TestVendorStoreRoutesMounted(t *testing.T) {
+	var logs bytes.Buffer
+	log := logger.New("debug", &logs)
+	mock := &storeHandlerMock{}
+
+	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), nil,
+		router.Handlers{
+			Health: handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
+			Auth:   handler.NewAuthHandler(nil),
+			Store:  mock,
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := do(r, http.MethodGet, "/vendor/stores")
+	if w.Code != http.StatusOK || !mock.listCalled {
+		t.Fatalf("GET /vendor/stores: got %d, called %v", w.Code, mock.listCalled)
+	}
+
+	w = do(r, http.MethodGet, "/vendor/stores/store-123")
+	if w.Code != http.StatusOK || !mock.getCalled {
+		t.Fatalf("GET /vendor/stores/:id: got %d, called %v", w.Code, mock.getCalled)
+	}
+
+	mock.updateCalled = false
+	w = do(r, http.MethodPatch, "/vendor/stores/store-123")
+	if w.Code != http.StatusOK || !mock.updateCalled {
+		t.Fatalf("PATCH /vendor/stores/:id: got %d, called %v", w.Code, mock.updateCalled)
+	}
+
+	mock.updateCalled = false
+	w = do(r, http.MethodPut, "/vendor/stores/store-123")
+	if w.Code != http.StatusOK || !mock.updateCalled {
+		t.Fatalf("PUT /vendor/stores/:id: got %d, called %v", w.Code, mock.updateCalled)
+	}
+}
+
+type storeRequestHandlerMock struct {
+	listCalled   bool
+	getCalled    bool
+	createCalled bool
+}
+
+func (m *storeRequestHandlerMock) ListStoreRequests(c *gin.Context) {
+	m.listCalled = true
+	c.JSON(http.StatusOK, gin.H{"status": "listed"})
+}
+
+func (m *storeRequestHandlerMock) GetStoreRequest(c *gin.Context) {
+	m.getCalled = true
+	c.JSON(http.StatusOK, gin.H{"status": "retrieved", "id": c.Param("id")})
+}
+
+func (m *storeRequestHandlerMock) CreateStoreRequest(c *gin.Context) {
+	m.createCalled = true
+	c.JSON(http.StatusCreated, gin.H{"status": "created"})
+}
+
+func TestVendorStoreRequestRoutesMounted(t *testing.T) {
+	var logs bytes.Buffer
+	log := logger.New("debug", &logs)
+	mock := &storeRequestHandlerMock{}
+
+	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), nil,
+		router.Handlers{
+			Health:       handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
+			Auth:         handler.NewAuthHandler(nil),
+			StoreRequest: mock,
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := do(r, http.MethodGet, "/vendor/store-requests")
+	if w.Code != http.StatusOK || !mock.listCalled {
+		t.Fatalf("GET /vendor/store-requests: got %d, called %v", w.Code, mock.listCalled)
+	}
+
+	w = do(r, http.MethodGet, "/vendor/store-requests/req-123")
+	if w.Code != http.StatusOK || !mock.getCalled {
+		t.Fatalf("GET /vendor/store-requests/:id: got %d, called %v", w.Code, mock.getCalled)
+	}
+
+	w = do(r, http.MethodPost, "/vendor/store-requests")
+	if w.Code != http.StatusCreated || !mock.createCalled {
+		t.Fatalf("POST /vendor/store-requests: got %d, called %v", w.Code, mock.createCalled)
+	}
+}

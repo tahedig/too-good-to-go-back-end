@@ -112,20 +112,24 @@ func TestStoreServiceGetStoreNotFound(t *testing.T) {
 
 func TestStoreServiceUpdateStore(t *testing.T) {
 	existing := &model.Store{
-		PublicID:           "store-1",
-		VendorID:           7,
-		Name:               "Old Name",
-		Biography:          "Old biography",
-		PickupAddress:      "Old address",
-		PickupInstructions: "Old instructions",
-		RatingAvg:          4.5,
-		TrustScore:         90,
-		ApprovalStatus:     "approved",
-		AvailabilityStatus: "available",
+		PublicID:            "store-1",
+		VendorID:            7,
+		VendorStatus:        "approved",
+		Name:                "Old Name",
+		Biography:           "Old biography",
+		PickupInstructions:  "Old instructions",
+		AddressLine:         "Old address",
+		RatingAvg:           4.5,
+		TrustScore:          90,
+		IsActive:            true,
+		AcceptsOrders:       true,
 	}
 
 	repo := &storeRepositoryStub{store: existing}
 	svc := NewStoreService(repo)
+
+	phone := "09124550120"
+	catID := int16(1)
 
 	updated, err := svc.UpdateStore(
 		context.Background(),
@@ -133,13 +137,25 @@ func TestStoreServiceUpdateStore(t *testing.T) {
 		"store-1",
 		&model.Store{
 			Name:               "  New Name  ",
+			AddressLine:        "  New address  ",
 			Biography:          "  New biography  ",
-			PickupAddress:      "  New address  ",
 			PickupInstructions: "  New instructions  ",
-			VendorID:           999,
-			RatingAvg:          1,
-			TrustScore:         1,
-			ApprovalStatus:     "rejected",
+			Phone:              &phone,
+			CategoryID:         &catID,
+			Location:           model.StoreLocation{Latitude: 35.7, Longitude: 51.4},
+			WorkingHours: []model.WorkingHour{
+				{DayOfWeek: 0, DayNameFa: "شنبه", OpenTime: "08:00", CloseTime: "19:00", IsClosed: false},
+				{DayOfWeek: 6, DayNameFa: "جمعه", IsClosed: true},
+			},
+			Images: []model.StoreImage{
+				{ID: "img-1", URL: "https://example.com/1.jpg", IsPrimary: true, SortOrder: 1},
+			},
+			VendorID:      999,
+			VendorStatus:  "rejected",
+			RatingAvg:     1,
+			TrustScore:    1,
+			IsActive:      false,
+			AcceptsOrders: false,
 		},
 	)
 
@@ -147,18 +163,26 @@ func TestStoreServiceUpdateStore(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	// Verify all editable fields were updated
 	if updated.Name != "New Name" ||
+		updated.AddressLine != "New address" ||
 		updated.Biography != "New biography" ||
-		updated.PickupAddress != "New address" ||
-		updated.PickupInstructions != "New instructions" {
+		updated.PickupInstructions != "New instructions" ||
+		*updated.Phone != "09124550120" ||
+		*updated.CategoryID != 1 ||
+		updated.Location.Latitude != 35.7 ||
+		len(updated.WorkingHours) != 2 ||
+		len(updated.Images) != 1 {
 		t.Fatalf("editable fields were not updated correctly: %+v", updated)
 	}
 
+	// Verify protected fields were NOT modified
 	if updated.VendorID != 7 ||
+		updated.VendorStatus != "approved" ||
 		updated.RatingAvg != 4.5 ||
 		updated.TrustScore != 90 ||
-		updated.ApprovalStatus != "approved" ||
-		updated.AvailabilityStatus != "available" {
+		!updated.IsActive ||
+		!updated.AcceptsOrders {
 		t.Fatalf("protected fields were modified: %+v", updated)
 	}
 
@@ -179,7 +203,7 @@ func TestStoreServiceUpdateStoreValidation(t *testing.T) {
 		{
 			name: "missing name",
 			updated: &model.Store{
-				PickupAddress: "Some address",
+				AddressLine: "Some address",
 			},
 		},
 		{
@@ -244,7 +268,7 @@ func TestStoreServiceRepositoryErrors(t *testing.T) {
 			context.Background(),
 			42,
 			"store-1",
-			&model.Store{Name: "Store", PickupAddress: "Address"},
+			&model.Store{Name: "Store", AddressLine: "Address"},
 		)
 
 		if err == nil {
@@ -261,7 +285,7 @@ func TestStoreServiceRepositoryErrors(t *testing.T) {
 			context.Background(),
 			42,
 			"store-1",
-			&model.Store{Name: "Store", PickupAddress: "Address"},
+			&model.Store{Name: "Store", AddressLine: "Address"},
 		)
 
 		if err == nil {

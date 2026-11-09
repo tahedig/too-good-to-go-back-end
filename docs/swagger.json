@@ -137,9 +137,343 @@
                     }
                 }
             }
+        },
+        "/vendor/store-requests": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves all store creation/branch requests submitted by the authenticated vendor.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendor"
+                ],
+                "summary": "List vendor store requests",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.StoreRequestListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Submits a request to create a new store or branch.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendor"
+                ],
+                "summary": "Submit a new store request",
+                "parameters": [
+                    {
+                        "description": "Store creation request payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateStoreRequestInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.StoreRequestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vendor/store-requests/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves status and details of a store creation request.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendor"
+                ],
+                "summary": "Get store request details",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Store Request Public ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.StoreRequestResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vendor/stores": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves all stores owned by the authenticated vendor.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendor"
+                ],
+                "summary": "List vendor stores",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.StoreListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vendor/stores/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves store information for a store owned by the authenticated vendor.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendor"
+                ],
+                "summary": "Get vendor store details",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Store Public ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.StoreResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates editable fields (name, pickup address, category, phone, biography, instructions, working hours, images, location) for a store owned by the authenticated vendor.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendor"
+                ],
+                "summary": "Update vendor store information",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Store Public ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Store update payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateStoreRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.StoreResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "dto.CreateStoreRequestInput": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "example": "تهران، خیابان شریعتی"
+                },
+                "category_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "owner_name": {
+                    "type": "string",
+                    "example": "آیدا کریمی"
+                },
+                "store_name": {
+                    "type": "string",
+                    "example": "نان صبحگاهی - شعبه شریعتی"
+                }
+            }
+        },
         "dto.ErrorBody": {
             "type": "object",
             "properties": {
@@ -222,6 +556,243 @@
                 }
             }
         },
+        "dto.StoreImageDTO": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "img-1"
+                },
+                "is_primary": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "sort_order": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "url": {
+                    "type": "string",
+                    "example": "https://example.com/store.jpg"
+                }
+            }
+        },
+        "dto.StoreListResponse": {
+            "type": "object",
+            "properties": {
+                "stores": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.StoreResponse"
+                    }
+                }
+            }
+        },
+        "dto.StoreLocationResponse": {
+            "type": "object",
+            "properties": {
+                "latitude": {
+                    "type": "number",
+                    "example": 35.6892
+                },
+                "longitude": {
+                    "type": "number",
+                    "example": 51.389
+                }
+            }
+        },
+        "dto.StoreRequestListResponse": {
+            "type": "object",
+            "properties": {
+                "requests": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.StoreRequestResponse"
+                    }
+                }
+            }
+        },
+        "dto.StoreRequestResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "example": "تهران، خیابان شریعتی"
+                },
+                "category_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "category_name": {
+                    "type": "string",
+                    "example": "نانوایی"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string",
+                    "example": "۲۷ مهر ۱۴۰۵"
+                },
+                "notice": {
+                    "type": "string",
+                    "example": "این شعبه پس از تأیید، امکان انتشار محصول خواهد داشت."
+                },
+                "owner_name": {
+                    "type": "string",
+                    "example": "آیدا کریمی"
+                },
+                "public_id": {
+                    "type": "string",
+                    "example": "req-550e8400-e29b-41d4-a716-446655440000"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "pending_review"
+                },
+                "status_fa": {
+                    "type": "string",
+                    "example": "در انتظار بررسی"
+                },
+                "store_name": {
+                    "type": "string",
+                    "example": "نان صبحگاهی - شعبه شریعتی"
+                }
+            }
+        },
+        "dto.StoreResponse": {
+            "type": "object",
+            "properties": {
+                "active_products_count": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "approval_status": {
+                    "type": "string"
+                },
+                "availability_status": {
+                    "type": "string"
+                },
+                "biography": {
+                    "type": "string",
+                    "example": "نانوایی محلی با نان‌های تازه و شیرینی‌های پخت روز."
+                },
+                "category_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "category_name": {
+                    "type": "string",
+                    "example": "نانوایی"
+                },
+                "closed_days_summary": {
+                    "type": "string",
+                    "example": "پنج‌شنبه و جمعه تعطیل"
+                },
+                "cover_image_url": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.StoreImageDTO"
+                    }
+                },
+                "location": {
+                    "$ref": "#/definitions/dto.StoreLocationResponse"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "نان صبحگاهی"
+                },
+                "owner_name": {
+                    "type": "string",
+                    "example": "آیدا کریمی"
+                },
+                "phone": {
+                    "type": "string",
+                    "example": "09124550120"
+                },
+                "pickup_address": {
+                    "type": "string",
+                    "example": "تهران، خیابان ولیعصر، پلاک ۱۲"
+                },
+                "pickup_instructions": {
+                    "type": "string",
+                    "example": "تحویل از پیشخوان نانوایی، ورودی خیابان ولیعصر."
+                },
+                "public_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "rating_avg": {
+                    "type": "number"
+                },
+                "trust_score": {
+                    "type": "number"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "working_hours": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.WorkingHourDTO"
+                    }
+                },
+                "working_hours_summary": {
+                    "type": "string",
+                    "example": "شنبه تا چهارشنبه · ۰۸:۰۰ تا ۱۹:۰۰"
+                }
+            }
+        },
+        "dto.UpdateStoreRequest": {
+            "type": "object",
+            "properties": {
+                "biography": {
+                    "type": "string",
+                    "example": "نانوایی محلی با نان‌های تازه و شیرینی‌های پخت روز."
+                },
+                "category_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.StoreImageDTO"
+                    }
+                },
+                "location": {
+                    "$ref": "#/definitions/dto.StoreLocationResponse"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "نان صبحگاهی"
+                },
+                "phone": {
+                    "type": "string",
+                    "example": "09124550120"
+                },
+                "pickup_address": {
+                    "type": "string",
+                    "example": "تهران، خیابان ولیعصر، پلاک ۱۲"
+                },
+                "pickup_instructions": {
+                    "type": "string",
+                    "example": "تحویل از پیشخوان نانوایی، ورودی خیابان ولیعصر."
+                },
+                "working_hours": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.WorkingHourDTO"
+                    }
+                }
+            }
+        },
         "dto.VerifyOTPRequest": {
             "type": "object",
             "properties": {
@@ -245,6 +816,36 @@
                 "verified": {
                     "type": "boolean",
                     "example": true
+                }
+            }
+        },
+        "dto.WorkingHourDTO": {
+            "type": "object",
+            "properties": {
+                "close_time": {
+                    "type": "string",
+                    "example": "19:00"
+                },
+                "day_name": {
+                    "type": "string",
+                    "example": "saturday"
+                },
+                "day_name_fa": {
+                    "type": "string",
+                    "example": "شنبه"
+                },
+                "day_of_week": {
+                    "description": "0 = Saturday, 1 = Sunday, ..., 6 = Friday",
+                    "type": "integer",
+                    "example": 0
+                },
+                "is_closed": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "open_time": {
+                    "type": "string",
+                    "example": "08:00"
                 }
             }
         }

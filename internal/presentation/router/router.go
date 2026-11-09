@@ -20,7 +20,9 @@ import (
 // Handlers groups every HTTP handler. Add new feature handlers here.
 type Handlers struct {
 	Health handlerinterface.HealthHandler
-	Auth   handlerinterface.AuthHandler
+	Auth         handlerinterface.AuthHandler
+	Store        handlerinterface.StoreHandler
+	StoreRequest handlerinterface.StoreRequestHandler
 }
 
 func New(
@@ -69,6 +71,21 @@ func New(
 	}
 	auth.POST("/request", h.Auth.RequestOTP)
 	auth.POST("/verify", h.Auth.VerifyOTP)
+
+	if h.Store != nil {
+		vendor := r.Group("/vendor")
+		vendor.GET("/stores", h.Store.ListStores)
+		vendor.GET("/stores/:id", h.Store.GetStore)
+		vendor.PATCH("/stores/:id", h.Store.UpdateStore)
+		vendor.PUT("/stores/:id", h.Store.UpdateStore)
+	}
+
+	if h.StoreRequest != nil {
+		requests := r.Group("/vendor/store-requests")
+		requests.GET("", h.StoreRequest.ListStoreRequests)
+		requests.GET("/:id", h.StoreRequest.GetStoreRequest)
+		requests.POST("", h.StoreRequest.CreateStoreRequest)
+	}
 
 	return r, nil
 }

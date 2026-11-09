@@ -52,8 +52,7 @@ func (s *storeService) UpdateStore(
 	}
 
 	name := strings.TrimSpace(updated.Name)
-	address := strings.TrimSpace(updated.PickupAddress)
-	instructions := strings.TrimSpace(updated.PickupInstructions)
+	address := strings.TrimSpace(updated.AddressLine)
 
 	var fieldErrors []exception.FieldError
 
@@ -84,12 +83,35 @@ func (s *storeService) UpdateStore(
 		return nil, exception.NewNotFound("store not found")
 	}
 
-	// Only update fields that vendors are allowed to edit.
-	// Ownership, IDs, ratings, trust scores, and statuses remain unchanged.
+	// Update all editable store form fields
 	store.Name = name
+	store.AddressLine = address
 	store.Biography = strings.TrimSpace(updated.Biography)
-	store.PickupAddress = address
-	store.PickupInstructions = instructions
+	store.PickupInstructions = strings.TrimSpace(updated.PickupInstructions)
+
+	if updated.CategoryID != nil {
+		store.CategoryID = updated.CategoryID
+	}
+
+	if updated.Phone != nil {
+		trimmedPhone := strings.TrimSpace(*updated.Phone)
+		store.Phone = &trimmedPhone
+	}
+
+	if updated.Location.Latitude != 0 || updated.Location.Longitude != 0 {
+		store.Location = updated.Location
+	}
+
+	if len(updated.WorkingHours) > 0 {
+		store.WorkingHours = updated.WorkingHours
+	}
+
+	if len(updated.Images) > 0 {
+		store.Images = updated.Images
+	}
+
+	// Ownership, VendorID, VendorStatus, RatingAvg, TrustScore, IsActive,
+	// and AcceptsOrders remain strictly protected.
 
 	if err := s.repo.Update(ctx, store); err != nil {
 		return nil, exception.NewInternalServer(err)
