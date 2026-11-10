@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/tahedig/too-good-to-go/backend/internal/apperr" 
+	"github.com/tahedig/too-good-to-go/backend/internal/apperr"
 )
 
 func RequestID() gin.HandlerFunc {
