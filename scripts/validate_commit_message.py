@@ -20,16 +20,16 @@ FORMAT = "<type>: <short summary> issue: <Jira issue key> description: <brief ex
 EXAMPLE = "feat: add OTP request endpoint issue: TGTG-24 description: Add phone validation and create an OTP through the configured SMS provider."
 
 
-def read_subject(args):
-    if args.file:
-        content = Path(args.file).read_text(encoding="utf-8")
+def read_subject(message_value=None, file_path=None):
+    if file_path:
+        content = Path(file_path).read_text(encoding="utf-8")
         for line in content.splitlines():
             if line.strip():
                 return line.strip()
         raise ValueError("Commit message file is empty.")
 
-    if args.message is not None:
-        content = args.message
+    if message_value is not None:
+        content = message_value
     else:
         content = sys.stdin.read()
 
@@ -77,11 +77,15 @@ def main():
         description="Validate a commit message against the team's Git convention."
     )
     parser.add_argument("message", nargs="?", help="Commit subject to validate")
+    parser.add_argument("--message", dest="message_flag", help="Commit subject to validate")
     parser.add_argument("--file", help="Read the commit message from a file")
     args = parser.parse_args()
 
+    # Support both current CI usage (`--message`) and the old positional style.
+    message_value = args.message_flag if args.message_flag is not None else args.message
+
     try:
-        subject = read_subject(args)
+        subject = read_subject(message_value=message_value, file_path=args.file)
         validate_commit_message(subject)
     except ValueError as exc:
         print(f"Commit validation failed: {exc}", file=sys.stderr)
