@@ -22,7 +22,7 @@ func NewClient(ctx context.Context, url string) (*goredis.Client, error) {
 	// RESP2 and no CLIENT SETINFO keep older servers (e.g. Redis 3 on
 	// Windows dev machines) working; nothing here needs RESP3.
 	opts.Protocol = 2
-	opts.DisableIndentity = true
+	opts.DisableIdentity = true
 
 	client := goredis.NewClient(opts)
 	if err := client.Ping(ctx).Err(); err != nil {

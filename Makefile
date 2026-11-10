@@ -1,7 +1,7 @@
 DB_URL ?= postgres://app:app@localhost:5432/tgtg?sslmode=disable
 MIGRATE = migrate -path migrations -database "$(DB_URL)"
 
-.PHONY: migrate-up migrate-down migrate-reset migrate-version migrate-force migrate-new migrate-test migrate-test-docker
+.PHONY: migrate-up migrate-down migrate-reset migrate-version migrate-force migrate-new migrate-test migrate-test-docker validate-branch validate-commit
 
 migrate-up:      ; $(MIGRATE) up
 migrate-down:    ; $(MIGRATE) down 1          # roll back the last migration only
@@ -11,3 +11,5 @@ migrate-force:   ; $(MIGRATE) force $(v)      # after fixing a "dirty" state: ma
 migrate-new:     ; migrate create -ext sql -dir migrations -seq $(name)
 migrate-test:    ; bash scripts/test_migrations_local.sh   # no Docker needed
 migrate-test-docker: ; bash scripts/test_migrations.sh
+validate-branch: ; python3 scripts/validate_branch_name.py "$(branch)"
+validate-commit: ; python3 scripts/validate_commit_message.py "$(msg)"
