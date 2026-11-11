@@ -21,10 +21,36 @@ type Config struct {
 	HTTPWriteTimeout    time.Duration
 	HTTPIdleTimeout     time.Duration
 	HTTPShutdownTimeout time.Duration
+	// HTTPMaxBodyBytes caps request bodies; larger ones get 413.
+	HTTPMaxBodyBytes int64
 
 	HealthCheckTimeout time.Duration
 
 	LogLevel string
+
+	OTPLength      int
+	OTPTTL         time.Duration
+	OTPMaxAttempts int
+	// OTPResendCooldown is the minimum gap between two codes for one phone.
+	OTPResendCooldown time.Duration
+	// OTPExposeCode returns the generated code in the /auth/otp/request
+	// response so the flow can be tested end to end while SMS delivery is
+	// faked. Refused when APP_ENV is production.
+	OTPExposeCode bool
+	// SMSProvider selects the SMS implementation; only "fake" exists for now.
+	SMSProvider string
+
+	// AuthRateLimit requests per AuthRateWindow are allowed per client IP on
+	// the /auth/otp endpoints.
+	AuthRateLimit  int
+	AuthRateWindow time.Duration
+
+	// RedisURL (redis://[:password@]host:port/db) stores OTPs and rate-limit
+	// counters. Required outside development; when empty in development
+	// they are kept in process memory.
+	RedisURL string
+	// RedisKeyPrefix namespaces every key, so environments can share a Redis.
+	RedisKeyPrefix string
 
 	// TrustedProxies is the list of proxy IPs/CIDRs allowed to set
 	// X-Forwarded-For. Empty means no proxy is trusted.
@@ -55,9 +81,26 @@ func LoadConfig() (*Config, error) {
 		HTTPWriteTimeout:    p.duration("HTTP_WRITE_TIMEOUT", 15*time.Second),
 		HTTPIdleTimeout:     p.duration("HTTP_IDLE_TIMEOUT", 60*time.Second),
 		HTTPShutdownTimeout: p.duration("HTTP_SHUTDOWN_TIMEOUT", 10*time.Second),
+		HTTPMaxBodyBytes:    int64(p.intRange("HTTP_MAX_BODY_BYTES", 1<<20, 1<<10, 64<<20)),
 		HealthCheckTimeout:  p.duration("HEALTH_CHECK_TIMEOUT", 2*time.Second),
 		LogLevel:            p.oneOf("LOG_LEVEL", "info", "debug", "info", "warn", "error"),
+		OTPLength:           p.intRange("OTP_LENGTH", 6, 4, 8),
+		OTPTTL:              p.duration("OTP_TTL", 5*time.Minute),
+		OTPMaxAttempts:      p.intRange("OTP_MAX_ATTEMPTS", 5, 1, 20),
+		OTPResendCooldown:   p.duration("OTP_RESEND_COOLDOWN", time.Minute),
+		OTPExposeCode:       p.bool("OTP_EXPOSE_CODE", false),
+		SMSProvider:         p.oneOf("SMS_PROVIDER", SMSProviderFake, SMSProviderFake),
+		AuthRateLimit:       p.intRange("AUTH_RATE_LIMIT", 20, 1, 10000),
+		AuthRateWindow:      p.duration("AUTH_RATE_WINDOW", time.Minute),
+		RedisURL:            p.string("REDIS_URL", ""),
+		RedisKeyPrefix:      p.string("REDIS_KEY_PREFIX", "tgtg:"),
 		TrustedProxies:      p.list("TRUSTED_PROXIES"),
+	}
+	if cfg.RedisURL == "" && cfg.AppEnv != EnvDevelopment {
+		p.errs = append(p.errs, errors.New("REDIS_URL is required when APP_ENV is not development"))
+	}
+	if cfg.OTPExposeCode && cfg.IsProduction() {
+		p.errs = append(p.errs, errors.New("OTP_EXPOSE_CODE must not be enabled in production"))
 	}
 
 	if err := errors.Join(p.errs...); err != nil {
@@ -72,9 +115,11 @@ type envParser struct {
 	errs []error
 }
 
+// string returns def when the variable is unset or blank, so the empty
+// placeholders copied from .env.example mean "use the default".
 func (p *envParser) string(key, def string) string {
-	if v, ok := os.LookupEnv(key); ok {
-		return strings.TrimSpace(v)
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+		return v
 	}
 	return def
 }
@@ -93,6 +138,19 @@ func (p *envParser) oneOf(key, def string, allowed ...string) string {
 	return def
 }
 
+func (p *envParser) bool(key string, def bool) bool {
+	raw := p.string(key, "")
+	if raw == "" {
+		return def
+	}
+	b, err := strconv.ParseBool(raw)
+	if err != nil {
+		p.errs = append(p.errs, fmt.Errorf("%s=%q must be true or false", key, raw))
+		return def
+	}
+	return b
+}
+
 func (p *envParser) port(key string, def int) int {
 	raw := p.string(key, "")
 	if raw == "" {
@@ -101,6 +159,19 @@ func (p *envParser) port(key string, def int) int {
 	n, err := strconv.Atoi(raw)
 	if err != nil || n < 1 || n > 65535 {
 		p.errs = append(p.errs, fmt.Errorf("%s=%q must be a port number between 1 and 65535", key, raw))
+		return def
+	}
+	return n
+}
+
+func (p *envParser) intRange(key string, def, lo, hi int) int {
+	raw := p.string(key, "")
+	if raw == "" {
+		return def
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < lo || n > hi {
+		p.errs = append(p.errs, fmt.Errorf("%s=%q must be a number between %d and %d", key, raw, lo, hi))
 		return def
 	}
 	return n

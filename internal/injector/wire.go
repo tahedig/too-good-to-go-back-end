@@ -13,14 +13,27 @@ import (
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/router"
 )
 
-func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*App, error) {
+// InitializeApp builds the whole application. The returned cleanup releases
+// external connections (Redis) and must run after the HTTP server stopped.
+func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*App, func(), error) {
 	wire.Build(
+		// infrastructure
+		provideStorage,
+		provideRateLimiter,
+		provideSMSSender,
+
+		// application
 		provideHealthService,
+		provideAuthService,
+
+		// presentation
 		handler.NewHealthHandler,
+		handler.NewAuthHandler,
 		middleware.NewErrorHandler,
 		provideHandlers,
 		router.New,
+
 		newApp,
 	)
-	return nil, nil
+	return nil, nil, nil
 }

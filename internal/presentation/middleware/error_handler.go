@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -85,6 +86,11 @@ func (h *errorHandler) write(c *gin.Context, err error) {
 	if appErr.StatusCode() >= http.StatusInternalServerError {
 		logger.FromContext(c.Request.Context(), h.log).Error("request failed",
 			"status", appErr.StatusCode(), "code", appErr.Code(), "error", err.Error())
+	}
+
+	var retryable exception.Retryable
+	if errors.As(appErr, &retryable) && retryable.RetryAfter() > 0 {
+		c.Header("Retry-After", strconv.Itoa(exception.RetryAfterSeconds(retryable.RetryAfter())))
 	}
 
 	c.AbortWithStatusJSON(appErr.StatusCode(), dto.ErrorResponse{
