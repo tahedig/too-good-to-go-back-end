@@ -1,4 +1,4 @@
-﻿global:
+global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
@@ -8,5 +8,5 @@ scrape_configs:
       - targets:
           - "node-exporter:9100"
         labels:
-          environment: "local"
-          server: "docker-desktop-local"
+          environment: "staging"
+          server: "staging-server"
