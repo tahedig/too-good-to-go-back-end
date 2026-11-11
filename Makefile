@@ -1,7 +1,7 @@
 DB_URL ?= postgres://app:app@localhost:5432/tgtg?sslmode=disable
 MIGRATE = migrate -path migrations -database "$(DB_URL)"
 
-.PHONY: migrate-up migrate-down migrate-reset migrate-version migrate-force migrate-new migrate-test migrate-test-docker
+.PHONY: migrate-up migrate-down migrate-reset migrate-version migrate-force migrate-new migrate-test migrate-test-docker validate-branch validate-commit
 
 migrate-up:      ; $(MIGRATE) up
 migrate-down:    ; $(MIGRATE) down 1          # roll back the last migration only
@@ -16,3 +16,5 @@ migrate-test-docker: ; bash scripts/test_migrations.sh
 db-backup:       ; bash scripts/db/backup.sh                    # needs DB_BACKUP_ENV, see docs/db-backup-restore.md
 db-restore:      ; bash scripts/db/restore.sh                   # latest backup -> tgtg_restore_<ts>, verified, then dropped
 db-backup-test:  ; bash scripts/db/test_backup_restore.sh       # self-contained, local PostgreSQL, run as non-root
+validate-branch: ; python3 scripts/validate_branch_name.py "$(branch)"
+validate-commit: ; python3 scripts/validate_commit_message.py "$(msg)"
