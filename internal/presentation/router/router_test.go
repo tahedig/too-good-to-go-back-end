@@ -11,14 +11,18 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/tahedig/too-good-to-go/backend/internal/application/dto"
 	"github.com/tahedig/too-good-to-go/backend/internal/application/service"
 	serviceinterface "github.com/tahedig/too-good-to-go/backend/internal/application/service/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/bootstrap"
+	"github.com/tahedig/too-good-to-go/backend/internal/domain/enum"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/exception"
+	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/token"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/handler"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware"
+	middlewareinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/router"
 	"github.com/tahedig/too-good-to-go/backend/pkg/logger"
 )
@@ -145,5 +149,242 @@ func TestIncomingRequestIDIsReusedAndValidated(t *testing.T) {
 	r.ServeHTTP(w, req)
 	if got := w.Header().Get(bootstrap.HeaderRequestID); got == "bad\nid" || got == "" {
 		t.Fatalf("invalid incoming id should be replaced, got %q", got)
+	}
+}
+
+type storeHandlerMock struct {
+	listCalled   bool
+	getCalled    bool
+	updateCalled bool
+}
+
+func (m *storeHandlerMock) ListStores(c *gin.Context) {
+	m.listCalled = true
+	c.JSON(http.StatusOK, gin.H{"status": "listed"})
+}
+
+func (m *storeHandlerMock) GetStore(c *gin.Context) {
+	m.getCalled = true
+	c.JSON(http.StatusOK, gin.H{"status": "retrieved", "id": c.Param("id")})
+}
+
+func (m *storeHandlerMock) UpdateStore(c *gin.Context) {
+	m.updateCalled = true
+	c.JSON(http.StatusOK, gin.H{"status": "updated", "id": c.Param("id")})
+}
+
+func TestVendorStoreRoutesMounted(t *testing.T) {
+	var logs bytes.Buffer
+	log := logger.New("debug", &logs)
+	mock := &storeHandlerMock{}
+
+	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), testAuthMiddleware(), nil,
+		router.Handlers{
+			Health: handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
+			Auth:   handler.NewAuthHandler(nil),
+			Store:  mock,
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	do := vendorDo(t)
+
+	w := do(r, http.MethodGet, "/vendor/stores")
+	if w.Code != http.StatusOK || !mock.listCalled {
+		t.Fatalf("GET /vendor/stores: got %d, called %v", w.Code, mock.listCalled)
+	}
+
+	w = do(r, http.MethodGet, "/vendor/stores/store-123")
+	if w.Code != http.StatusOK || !mock.getCalled {
+		t.Fatalf("GET /vendor/stores/:id: got %d, called %v", w.Code, mock.getCalled)
+	}
+
+	mock.updateCalled = false
+	w = do(r, http.MethodPatch, "/vendor/stores/store-123")
+	if w.Code != http.StatusOK || !mock.updateCalled {
+		t.Fatalf("PATCH /vendor/stores/:id: got %d, called %v", w.Code, mock.updateCalled)
+	}
+
+	mock.updateCalled = false
+	w = do(r, http.MethodPut, "/vendor/stores/store-123")
+	if w.Code != http.StatusOK || !mock.updateCalled {
+		t.Fatalf("PUT /vendor/stores/:id: got %d, called %v", w.Code, mock.updateCalled)
+	}
+}
+
+type storeRequestHandlerMock struct {
+	listCalled   bool
+	getCalled    bool
+	createCalled bool
+}
+
+func (m *storeRequestHandlerMock) ListStoreRequests(c *gin.Context) {
+	m.listCalled = true
+	c.JSON(http.StatusOK, gin.H{"status": "listed"})
+}
+
+func (m *storeRequestHandlerMock) GetStoreRequest(c *gin.Context) {
+	m.getCalled = true
+	c.JSON(http.StatusOK, gin.H{"status": "retrieved", "id": c.Param("id")})
+}
+
+func (m *storeRequestHandlerMock) CreateStoreRequest(c *gin.Context) {
+	m.createCalled = true
+	c.JSON(http.StatusCreated, gin.H{"status": "created"})
+}
+
+func TestVendorStoreRequestRoutesMounted(t *testing.T) {
+	var logs bytes.Buffer
+	log := logger.New("debug", &logs)
+	mock := &storeRequestHandlerMock{}
+
+	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), testAuthMiddleware(), nil,
+		router.Handlers{
+			Health:       handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
+			Auth:         handler.NewAuthHandler(nil),
+			StoreRequest: mock,
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	do := vendorDo(t)
+
+	w := do(r, http.MethodGet, "/vendor/store-requests")
+	if w.Code != http.StatusOK || !mock.listCalled {
+		t.Fatalf("GET /vendor/store-requests: got %d, called %v", w.Code, mock.listCalled)
+	}
+
+	w = do(r, http.MethodGet, "/vendor/store-requests/req-123")
+	if w.Code != http.StatusOK || !mock.getCalled {
+		t.Fatalf("GET /vendor/store-requests/:id: got %d, called %v", w.Code, mock.getCalled)
+	}
+
+	w = do(r, http.MethodPost, "/vendor/store-requests")
+	if w.Code != http.StatusCreated || !mock.createCalled {
+		t.Fatalf("POST /vendor/store-requests: got %d, called %v", w.Code, mock.createCalled)
+	}
+}
+
+type publicStoreHandlerMock struct {
+	getCalled bool
+}
+
+func (m *publicStoreHandlerMock) GetPublicStore(c *gin.Context) {
+	m.getCalled = true
+	c.JSON(http.StatusOK, gin.H{"id": c.Param("id")})
+}
+
+func TestPublicStoreRouteMounted(t *testing.T) {
+	var logs bytes.Buffer
+	log := logger.New("debug", &logs)
+	mock := &publicStoreHandlerMock{}
+
+	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), nil, nil,
+		router.Handlers{
+			Health:      handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
+			Auth:        handler.NewAuthHandler(nil),
+			PublicStore: mock,
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := do(r, http.MethodGet, "/stores/store-123")
+	if w.Code != http.StatusOK || !mock.getCalled {
+		t.Fatalf("GET /stores/:id: got %d, called %v", w.Code, mock.getCalled)
+	}
+
+	mock.getCalled = false
+	w = do(r, http.MethodHead, "/stores/store-123")
+	if w.Code != http.StatusOK || !mock.getCalled {
+		t.Fatalf("HEAD /stores/:id: got %d, called %v", w.Code, mock.getCalled)
+	}
+}
+
+func testAuthMiddleware() middlewareinterface.AuthMiddleware {
+	return middleware.NewAuthMiddleware(token.NewJWTManager(rbacSecret, rbacIssuer, time.Hour))
+}
+
+func roleToken(t *testing.T, role enum.Role) string {
+	t.Helper()
+	return signToken(t, rbacSecret, rbacIssuer, role, jwt.SigningMethodHS256, time.Now().Add(time.Hour))
+}
+
+// vendorDo is do() with a valid vendor token.
+func vendorDo(t *testing.T) func(r http.Handler, method, path string) *httptest.ResponseRecorder {
+	t.Helper()
+	tok := roleToken(t, enum.RoleVendor)
+	return func(r http.Handler, method, path string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, path, nil)
+		req.Header.Set("Authorization", "Bearer "+tok)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w
+	}
+}
+
+// Vendor routes must reject missing tokens and non-vendor roles before the
+// handler runs.
+func TestVendorRoutesRequireVendorRole(t *testing.T) {
+	log := logger.New("debug", &bytes.Buffer{})
+	stores, requests := &storeHandlerMock{}, &storeRequestHandlerMock{}
+	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), testAuthMiddleware(), nil,
+		router.Handlers{
+			Health:       handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
+			Auth:         handler.NewAuthHandler(nil),
+			Store:        stores,
+			StoreRequest: requests,
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cases := map[string]struct {
+		header string
+		want   int
+	}{
+		"no token": {"", http.StatusUnauthorized},
+		"customer": {"Bearer " + roleToken(t, enum.RoleCustomer), http.StatusForbidden},
+		"admin":    {"Bearer " + roleToken(t, enum.RoleAdmin), http.StatusForbidden},
+	}
+	paths := []struct{ method, path string }{
+		{http.MethodGet, "/vendor/stores"},
+		{http.MethodGet, "/vendor/stores/s-1"},
+		{http.MethodPatch, "/vendor/stores/s-1"},
+		{http.MethodPut, "/vendor/stores/s-1"},
+		{http.MethodGet, "/vendor/store-requests"},
+		{http.MethodGet, "/vendor/store-requests/r-1"},
+		{http.MethodPost, "/vendor/store-requests"},
+	}
+	for name, tc := range cases {
+		for _, p := range paths {
+			req := httptest.NewRequest(p.method, p.path, nil)
+			if tc.header != "" {
+				req.Header.Set("Authorization", tc.header)
+			}
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			if w.Code != tc.want {
+				t.Errorf("%s %s %s: got %d, want %d", name, p.method, p.path, w.Code, tc.want)
+			}
+		}
+	}
+	if stores.listCalled || stores.getCalled || stores.updateCalled ||
+		requests.listCalled || requests.getCalled || requests.createCalled {
+		t.Fatal("a vendor handler ran without a vendor token")
+	}
+}
+
+// Without auth middleware the router must refuse to mount private routes.
+func TestRouterRefusesProtectedRoutesWithoutAuth(t *testing.T) {
+	log := logger.New("debug", &bytes.Buffer{})
+	_, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), nil, nil,
+		router.Handlers{
+			Health: handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
+			Auth:   handler.NewAuthHandler(nil),
+			Store:  &storeHandlerMock{},
+		})
+	if err == nil {
+		t.Fatal("router.New accepted vendor routes without auth middleware")
 	}
 }

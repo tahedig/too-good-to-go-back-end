@@ -1,3 +1,12 @@
+// @title           Too Good To Go API
+// @version         1.0
+// @description     REST API for the Too Good To Go application.
+// @BasePath        /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Enter your JWT as: Bearer <token>
+
 package main
 
 import (
