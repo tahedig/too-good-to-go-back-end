@@ -48,6 +48,17 @@ func (r *UserRepository) FindByID(_ context.Context, id string) (*model.User, er
 	return &cp, nil
 }
 
+func (r *UserRepository) UpdateFullName(_ context.Context, id, fullName string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	u, ok := r.byID[id]
+	if !ok {
+		return repository.ErrUserNotFound
+	}
+	u.FullName = fullName
+	return nil
+}
+
 // SetAccess replaces a stored user's role and status, like an admin action
 // on the database would. It reports false when the user does not exist.
 func (r *UserRepository) SetAccess(id string, role enum.Role, status model.UserStatus) bool {

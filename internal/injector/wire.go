@@ -29,11 +29,13 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 		provideTokenManager,
 		provideAuthService,
 		provideSessionService,
+		provideProfileService,
 
 		// presentation
 		handler.NewHealthHandler,
 		handler.NewAuthHandler,
 		handler.NewProtectedHandler,
+		handler.NewProfileHandler,
 		middleware.NewErrorHandler,
 		middleware.NewAuthMiddleware,
 		provideHandlers,

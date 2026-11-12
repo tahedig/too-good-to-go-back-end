@@ -40,7 +40,9 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 	authService := provideAuthService(cfg, log, injectorStorage, smsSender)
 	authHandler := handler.NewAuthHandler(authService, sessionService)
 	protectedHandler := handler.NewProtectedHandler()
-	handlers := provideHandlers(healthHandler, authHandler, protectedHandler)
+	profileService := provideProfileService(userRepository)
+	profileHandler := handler.NewProfileHandler(profileService)
+	handlers := provideHandlers(healthHandler, authHandler, protectedHandler, profileHandler)
 	engine, err := router.New(cfg, log, errorHandler, authMiddleware, rateLimiter, handlers)
 	if err != nil {
 		cleanup2()

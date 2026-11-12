@@ -18,4 +18,6 @@ type UserRepository interface {
 	// FindByID returns the current state of the user with this public ID, or
 	// ErrUserNotFound. Role is empty when the user holds no application role.
 	FindByID(ctx context.Context, id string) (*model.User, error)
+	// UpdateFullName changes only the user's editable profile name.
+	UpdateFullName(ctx context.Context, id, fullName string) error
 }

@@ -64,7 +64,7 @@ INSERT INTO users (public_id, phone, last_login_at)
 VALUES ($1::uuid, $2, now())
 ON CONFLICT (phone) DO UPDATE
     SET last_login_at = CASE WHEN users.status = 'active' THEN now() ELSE users.last_login_at END
-RETURNING id, public_id::text, phone, status::text, created_at, (xmax = 0) AS inserted`
+RETURNING id, public_id::text, phone, COALESCE(full_name, ''), status::text, created_at, (xmax = 0) AS inserted`
 
 const grantRoleSQL = `
 INSERT INTO user_roles (user_id, role_id)
@@ -96,7 +96,7 @@ func (r *userRepository) FindOrCreateByPhone(ctx context.Context, newUser *model
 			inserted  bool
 		)
 		if err := tx.QueryRow(ctx, upsertUserSQL, newUser.ID, newUser.Phone).
-			Scan(&dbID, &u.ID, &u.Phone, &status, &createdAt, &inserted); err != nil {
+			Scan(&dbID, &u.ID, &u.Phone, &u.FullName, &status, &createdAt, &inserted); err != nil {
 			return fmt.Errorf("upsert user: %w", err)
 		}
 		u.Status = model.UserStatus(status)
@@ -154,7 +154,7 @@ func highestRole(ctx context.Context, q querier, userID int64) (enum.Role, error
 }
 
 const findByIDSQL = `
-SELECT id, public_id::text, phone, status::text, created_at
+SELECT id, public_id::text, phone, COALESCE(full_name, ''), status::text, created_at
 FROM users
 WHERE public_id = $1::uuid`
 
@@ -171,7 +171,7 @@ func (r *userRepository) FindByID(ctx context.Context, id string) (*model.User, 
 		status    string
 		createdAt time.Time
 	)
-	err := r.pool.QueryRow(ctx, findByIDSQL, id).Scan(&dbID, &u.ID, &u.Phone, &status, &createdAt)
+	err := r.pool.QueryRow(ctx, findByIDSQL, id).Scan(&dbID, &u.ID, &u.Phone, &u.FullName, &status, &createdAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, repository.ErrUserNotFound
 	}
@@ -184,6 +184,20 @@ func (r *userRepository) FindByID(ctx context.Context, id string) (*model.User, 
 		return nil, err
 	}
 	return &u, nil
+}
+
+func (r *userRepository) UpdateFullName(ctx context.Context, id, fullName string) error {
+	if !security.IsID(id) {
+		return repository.ErrUserNotFound
+	}
+	tag, err := r.pool.Exec(ctx, `UPDATE users SET full_name = $2 WHERE public_id = $1::uuid`, id, fullName)
+	if err != nil {
+		return fmt.Errorf("update user full name: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return repository.ErrUserNotFound
+	}
+	return nil
 }
 
 // ErrSchemaMissing means the migrations have not been applied.
