@@ -36,6 +36,14 @@ func newTestPool(t *testing.T, migrate bool) *pgxpool.Pool {
 		t.Fatal(err)
 	}
 	t.Cleanup(admin.Close)
+	// Extensions can live in only one schema per database, so they are
+	// installed once in public (which stays on the search_path) and the
+	// migrations' CREATE EXTENSION IF NOT EXISTS become no-ops.
+	for _, ext := range []string{"postgis", "pg_trgm"} {
+		if _, err := admin.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS "+ext+" SCHEMA public"); err != nil {
+			t.Fatalf("extension %s (PostGIS must be installed): %v", ext, err)
+		}
+	}
 	schema := fmt.Sprintf("test_users_%d", time.Now().UnixNano())
 	if _, err := admin.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
 		t.Fatal(err)
@@ -46,7 +54,7 @@ func newTestPool(t *testing.T, migrate bool) *pgxpool.Pool {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg.ConnConfig.RuntimeParams["search_path"] = schema
+	cfg.ConnConfig.RuntimeParams["search_path"] = schema + ", public"
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		t.Fatal(err)
