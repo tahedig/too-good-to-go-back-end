@@ -115,6 +115,7 @@ func provideAuthService(
 // DATABASE_URL is set.
 type database struct {
 	users    repository.UserRepository
+	orders   repository.OrderRepository
 	checkers []serviceinterface.HealthChecker
 }
 
@@ -126,8 +127,8 @@ const dbConnectTimeout = 5 * time.Second
 // server stopped.
 func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func(), error) {
 	if cfg.DatabaseURL == "" {
-		log.Warn("DATABASE_URL is not set: users are kept in memory, are lost on restart and are not shared between instances")
-		return &database{users: memory.NewUserRepository()}, func() {}, nil
+		log.Warn("DATABASE_URL is not set: users and orders are kept in memory, are lost on restart and are not shared between instances")
+		return &database{users: memory.NewUserRepository(), orders: memory.NewOrderRepository()}, func() {}, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbConnectTimeout)
@@ -145,11 +146,14 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 
 	return &database{
 		users:    postgres.NewUserRepository(pool),
+		orders:   postgres.NewOrderRepository(pool),
 		checkers: []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
 	}, pool.Close, nil
 }
 
 func provideUserRepository(db *database) repository.UserRepository { return db.users }
+
+func provideOrderRepository(db *database) repository.OrderRepository { return db.orders }
 
 // providePhoneRoles maps ADMIN_PHONES / VENDOR_PHONES to the role a new user
 // with that phone receives. Admin wins if a phone is in both lists.
@@ -177,6 +181,7 @@ func provideHandlers(
 	health handlerinterface.HealthHandler,
 	auth handlerinterface.AuthHandler,
 	protected handlerinterface.ProtectedHandler,
+	order handlerinterface.OrderHandler,
 ) router.Handlers {
-	return router.Handlers{Health: health, Auth: auth, Protected: protected}
+	return router.Handlers{Health: health, Auth: auth, Protected: protected, Order: order}
 }
