@@ -1,0 +1,13 @@
+DROP FUNCTION IF EXISTS fn_release_expired_orders();
+DROP FUNCTION IF EXISTS fn_reserve_stock(BIGINT, INT);
+DROP TRIGGER  IF EXISTS trg_orders_history ON orders;
+DROP TRIGGER  IF EXISTS trg_orders_address ON orders;
+DROP TRIGGER  IF EXISTS trg_orders_guard   ON orders;
+DROP TABLE    IF EXISTS order_status_history;
+DROP TABLE    IF EXISTS order_items;
+DROP TABLE    IF EXISTS orders;
+DROP FUNCTION IF EXISTS fn_order_status_history();
+DROP FUNCTION IF EXISTS fn_order_address_snapshot();
+DROP FUNCTION IF EXISTS fn_order_status_guard();
+DROP TYPE     IF EXISTS actor_type;
+DROP TYPE     IF EXISTS order_status;
