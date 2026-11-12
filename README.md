@@ -73,6 +73,12 @@ go build -ldflags "-X main.version=v0.1.0" -o bin/api ./cmd/api
 | `AUTH_RATE_WINDOW` | `1m` | Window for `AUTH_RATE_LIMIT` |
 | `REDIS_URL` | (none) | `redis://[:password@]host:port/db` (`rediss://` for TLS). Stores OTPs and rate-limit counters. **Required** when `APP_ENV` is not `development`; unset in development falls back to process memory |
 | `REDIS_KEY_PREFIX` | `tgtg:` | Prefix for every Redis key, so environments can share one Redis |
+| `DATABASE_URL` | (none) | `postgres://user:pass@host:5432/db?sslmode=disable`. Stores users and their roles. **Required** when `APP_ENV` is not `development`; unset in development falls back to process memory (users are lost on restart) |
+| `JWT_SECRET` | (random in development) | HS256 signing secret, min 32 chars. **Required** when `APP_ENV` is not `development`; unset in development generates a random one per start |
+| `JWT_ISSUER` | `too-good-to-go-backend` | `iss` claim, checked on every request |
+| `JWT_ACCESS_TTL` | `1h` | Access token lifetime |
+| `ADMIN_PHONES` | (none) | Comma separated phones that become `admin` on first login |
+| `VENDOR_PHONES` | (none) | Comma separated phones that become `vendor` on first login |
 | `TRUSTED_PROXIES` | (none) | Comma separated proxy IPs/CIDRs for `X-Forwarded-For` |
 
 No secret or environment specific value is committed: `.env` is git-ignored and
@@ -81,12 +87,30 @@ only `.env.example` (placeholders and defaults) is tracked.
 ## OTP authentication
 
 Login is passwordless: the client requests a one-time code by SMS, then
-verifies it.
+verifies it. A successful verify logs the user in (creating the account on
+first login) and returns a JWT access token.
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `POST` | `/auth/otp/request` | none | `{"phone": "09123456789"}` sends a code. Iranian local, `98...` and E.164 formats are accepted |
-| `POST` | `/auth/otp/verify` | none | `{"phone": "...", "code": "123456"}` checks and consumes the code, returns `{"verified": true, "phone": "+98..."}` |
+| `POST` | `/auth/otp/verify` | none | `{"phone": "...", "code": "123456"}` checks and consumes the code, then returns a session (below) |
+
+Successful verify response:
+
+```json
+{
+  "verified": true,
+  "phone": "+989123456789",
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "user": { "id": "5f0c6d1e-...", "phone": "+989123456789", "role": "customer" }
+}
+```
+
+Send the token as `Authorization: Bearer <access_token>`. `expires_in` is in
+seconds (`JWT_ACCESS_TTL`); there is no refresh token yet, so log in again
+after it expires.
 
 Error codes clients should handle:
 
@@ -153,6 +177,80 @@ be added to `newSMSSender` in `internal/injector`.
 `serviceinterface.HealthChecker` (`Name()`, `Check(ctx)`) in the infrastructure
 layer and pass it to `service.NewHealthService` in `internal/injector`.
 Failure reasons are logged, never returned, because `/health` is public.
+
+## Authentication and RBAC (JWT)
+
+Protected routes require an HS256 access token:
+`Authorization: Bearer <access_token>`.
+
+| Method | Path | Access | Description |
+|---|---|---|---|
+| `GET` | `/auth/me` | any role | User id and role proven by the token |
+| `GET` | `/test/customer` | `customer` | RBAC test route |
+| `GET` | `/test/vendor` | `vendor` | RBAC test route |
+| `GET` | `/test/admin` | `admin` | RBAC test route |
+| any | `/vendor/stores...`, `/vendor/store-requests...` | `vendor` | Vendor store management |
+
+A missing, malformed, expired or wrongly signed token, a wrong issuer or
+algorithm, or an unknown role gets `401 UNAUTHORIZED`; a valid token with the
+wrong role gets `403 FORBIDDEN`.
+
+Tokens are issued by `POST /auth/otp/verify`, which calls
+`SessionService.Login` once the code is accepted. It loads or creates the user;
+new users are `customer` unless their number is in `ADMIN_PHONES` /
+`VENDOR_PHONES`. Roles of existing users are never changed on login.
+
+### Users in PostgreSQL
+
+With `DATABASE_URL` set, users live in the `users`, `roles` and `user_roles`
+tables from `migrations/`. Apply them before starting the server:
+
+```bash
+make migrate-up DB_URL="postgres://app:app@localhost:5432/tgtg?sslmode=disable"
+```
+
+The server checks the schema at startup and refuses to start with
+`database schema is missing or outdated` if the migrations were not applied.
+`/health` reports `postgres` once it is connected.
+
+- **IDs.** Tokens and API responses carry `users.public_id` (UUID). The numeric
+  `users.id` never leaves the database.
+- **First login** inserts the user and grants one role: `customer`,
+  `vendor_owner` (for `VENDOR_PHONES`) or `admin` (for `ADMIN_PHONES`). It is a
+  single `INSERT ... ON CONFLICT (phone)`, so parallel first logins create one
+  user. `last_login_at` is updated on every successful login.
+- **Roles.** A user acts with one role: the strongest they have in
+  `user_roles` (`admin` > `vendor_owner`/`vendor_staff` → `vendor` >
+  `customer`). `support` has no API role yet and is ignored. A user with no
+  mapped role is never given a default one: they get `403 FORBIDDEN`
+  (`this account has no role assigned`).
+- **Status.** `suspended` or `deleted` users get `403 FORBIDDEN`
+  (`this account is not active`) and no token.
+- **Every request is checked.** `Authenticate` reloads the user by the token's
+  ID, so suspending a user, deleting them or changing their roles takes effect
+  on their next request, not when the token expires. The role used for access
+  checks is the stored one, not the one in the token. A token for a user that
+  no longer exists gets `401`.
+
+OTP codes stay in Redis (the `otp_codes` table is not used): they are
+short-lived and Redis expires them on its own.
+
+Integration tests run against a real database when `TEST_DATABASE_URL` is set
+(each test creates and drops its own schema, so any empty database works);
+otherwise they are skipped:
+
+```bash
+TEST_DATABASE_URL="postgres://app:app@localhost:5432/tgtg_test?sslmode=disable"   go test ./internal/infrastructure/repository/postgres/
+```
+
+To protect a new route:
+
+```go
+group := r.Group("/vendor", authMW.Authenticate(), authMW.RequireRoles(enum.RoleVendor))
+```
+
+Handlers read the caller with `c.GetString(bootstrap.CtxKeyUserID)` and
+`c.GetString(bootstrap.CtxKeyUserRole)`.
 
 ## Error response format
 

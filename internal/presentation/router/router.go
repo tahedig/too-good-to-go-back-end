@@ -1,6 +1,7 @@
 package router
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -12,6 +13,7 @@ import (
 
 	serviceinterface "github.com/tahedig/too-good-to-go/backend/internal/application/service/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/bootstrap"
+	"github.com/tahedig/too-good-to-go/backend/internal/domain/enum"
 	handlerinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/handler/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware"
 	middlewareinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware/interface"
@@ -19,8 +21,9 @@ import (
 
 // Handlers groups every HTTP handler. Add new feature handlers here.
 type Handlers struct {
-	Health handlerinterface.HealthHandler
+	Health       handlerinterface.HealthHandler
 	Auth         handlerinterface.AuthHandler
+	Protected    handlerinterface.ProtectedHandler
 	Store        handlerinterface.StoreHandler
 	StoreRequest handlerinterface.StoreRequestHandler
 	PublicStore  handlerinterface.PublicStoreHandler
@@ -30,6 +33,7 @@ func New(
 	cfg *bootstrap.Config,
 	log *slog.Logger,
 	errHandler middlewareinterface.ErrorHandler,
+	authMW middlewareinterface.AuthMiddleware,
 	limiter serviceinterface.RateLimiter,
 	h Handlers,
 ) (*gin.Engine, error) {
@@ -73,19 +77,36 @@ func New(
 	auth.POST("/request", h.Auth.RequestOTP)
 	auth.POST("/verify", h.Auth.VerifyOTP)
 
+	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil) {
+		// Refuse to start rather than serve private routes unauthenticated.
+		return nil, errors.New("router: auth middleware is required for protected routes")
+	}
+
+	if h.Protected != nil {
+		r.GET("/auth/me", authMW.Authenticate(), h.Protected.Me)
+
+		// Test routes, one per role, to exercise RBAC.
+		test := r.Group("/test", authMW.Authenticate())
+		test.GET("/customer", authMW.RequireRoles(enum.RoleCustomer), h.Protected.CustomerArea)
+		test.GET("/vendor", authMW.RequireRoles(enum.RoleVendor), h.Protected.VendorArea)
+		test.GET("/admin", authMW.RequireRoles(enum.RoleAdmin), h.Protected.AdminArea)
+	}
+
+	// Everything under /vendor needs a valid token with the vendor role.
+	vendor := r.Group("/vendor")
+	if authMW != nil {
+		vendor.Use(authMW.Authenticate(), authMW.RequireRoles(enum.RoleVendor))
+	}
 	if h.Store != nil {
-		vendor := r.Group("/vendor")
 		vendor.GET("/stores", h.Store.ListStores)
 		vendor.GET("/stores/:id", h.Store.GetStore)
 		vendor.PATCH("/stores/:id", h.Store.UpdateStore)
 		vendor.PUT("/stores/:id", h.Store.UpdateStore)
 	}
-
 	if h.StoreRequest != nil {
-		requests := r.Group("/vendor/store-requests")
-		requests.GET("", h.StoreRequest.ListStoreRequests)
-		requests.GET("/:id", h.StoreRequest.GetStoreRequest)
-		requests.POST("", h.StoreRequest.CreateStoreRequest)
+		vendor.GET("/store-requests", h.StoreRequest.ListStoreRequests)
+		vendor.GET("/store-requests/:id", h.StoreRequest.GetStoreRequest)
+		vendor.POST("/store-requests", h.StoreRequest.CreateStoreRequest)
 	}
 
 	if h.PublicStore != nil {

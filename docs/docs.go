@@ -15,6 +15,42 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/auth/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Identity from the access token (any authenticated role)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN: the account is suspended, deleted or has no role",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/otp/request": {
             "post": {
                 "description": "Sends an OTP by SMS to the phone number. The code is never returned, except as debug_code when OTP_EXPOSE_CODE is enabled outside production.",
@@ -69,7 +105,7 @@ const docTemplate = `{
         },
         "/auth/otp/verify": {
             "post": {
-                "description": "Checks the code and consumes it on success. A malformed code is rejected without using up an attempt.",
+                "description": "Checks the code and consumes it on success, then logs the user in (creating the account on first login) and returns a JWT access token. A malformed code is rejected without using up an attempt.",
                 "consumes": [
                     "application/json"
                 ],
@@ -79,7 +115,7 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Verify a one-time password",
+                "summary": "Verify a one-time password and log in",
                 "parameters": [
                     {
                         "description": "Phone number and code",
@@ -100,6 +136,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN: the account is suspended or deleted",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -179,6 +221,114 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/test/admin": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rbac"
+                ],
+                "summary": "Admin-only test route",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/test/customer": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rbac"
+                ],
+                "summary": "Customer-only test route",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/test/vendor": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rbac"
+                ],
+                "summary": "Vendor-only test route",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -501,6 +651,28 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "dto.AuthUserInfo": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "5f0c6d1e-8b7a-4c1e-9a3f-2d4b6c8e0a12"
+                },
+                "phone": {
+                    "type": "string",
+                    "example": "+989123456789"
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "customer",
+                        "vendor",
+                        "admin"
+                    ],
+                    "example": "customer"
+                }
+            }
+        },
         "dto.CreateStoreRequestInput": {
             "type": "object",
             "properties": {
@@ -573,6 +745,24 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.MeResponse": {
+            "type": "object",
+            "properties": {
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "customer",
+                        "vendor",
+                        "admin"
+                    ],
+                    "example": "customer"
+                },
+                "user_id": {
+                    "type": "string",
+                    "example": "5f0c6d1e-8b7a-4c1e-9a3f-2d4b6c8e0a12"
                 }
             }
         },
@@ -995,9 +1185,25 @@ const docTemplate = `{
         "dto.VerifyOTPResponse": {
             "type": "object",
             "properties": {
+                "access_token": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                },
+                "expires_in": {
+                    "description": "seconds",
+                    "type": "integer",
+                    "example": 3600
+                },
                 "phone": {
                     "type": "string",
                     "example": "+989123456789"
+                },
+                "token_type": {
+                    "type": "string",
+                    "example": "Bearer"
+                },
+                "user": {
+                    "$ref": "#/definitions/dto.AuthUserInfo"
                 },
                 "verified": {
                     "type": "boolean",

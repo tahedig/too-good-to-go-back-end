@@ -20,24 +20,36 @@ import (
 // external connections (Redis) and must run after the HTTP server stopped.
 func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*App, func(), error) {
 	errorHandler := middleware.NewErrorHandler(log)
-	injectorStorage, cleanup, err := provideStorage(cfg, log)
+	injectorDatabase, cleanup, err := provideDatabase(cfg, log)
 	if err != nil {
 		return nil, nil, err
 	}
+	userRepository := provideUserRepository(injectorDatabase)
+	tokenManager := provideTokenManager(cfg)
+	sessionService := provideSessionService(cfg, log, userRepository, tokenManager)
+	authMiddleware := middleware.NewAuthMiddleware(sessionService)
+	injectorStorage, cleanup2, err := provideStorage(cfg, log)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
 	rateLimiter := provideRateLimiter(injectorStorage)
-	healthService := provideHealthService(cfg, log, version, injectorStorage)
+	healthService := provideHealthService(cfg, log, version, injectorStorage, injectorDatabase)
 	healthHandler := handler.NewHealthHandler(healthService)
 	smsSender := provideSMSSender(cfg, log)
 	authService := provideAuthService(cfg, log, injectorStorage, smsSender)
-	authHandler := handler.NewAuthHandler(authService)
-	handlers := provideHandlers(healthHandler, authHandler)
-	engine, err := router.New(cfg, log, errorHandler, rateLimiter, handlers)
+	authHandler := handler.NewAuthHandler(authService, sessionService)
+	protectedHandler := handler.NewProtectedHandler()
+	handlers := provideHandlers(healthHandler, authHandler, protectedHandler)
+	engine, err := router.New(cfg, log, errorHandler, authMiddleware, rateLimiter, handlers)
 	if err != nil {
+		cleanup2()
 		cleanup()
 		return nil, nil, err
 	}
 	app := newApp(engine, healthService)
 	return app, func() {
+		cleanup2()
 		cleanup()
 	}, nil
 }

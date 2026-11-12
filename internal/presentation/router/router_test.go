@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,9 +17,13 @@ import (
 	"github.com/tahedig/too-good-to-go/backend/internal/application/service"
 	serviceinterface "github.com/tahedig/too-good-to-go/backend/internal/application/service/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/bootstrap"
+	"github.com/tahedig/too-good-to-go/backend/internal/domain/enum"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/exception"
+	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/repository/memory"
+	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/token"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/handler"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware"
+	middlewareinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/router"
 	"github.com/tahedig/too-good-to-go/backend/pkg/logger"
 )
@@ -32,10 +37,11 @@ func newTestRouter(t *testing.T, logs *bytes.Buffer, checkers ...serviceinterfac
 	t.Helper()
 	log := logger.New("debug", logs)
 	svc := service.NewHealthService("test", time.Second, log, checkers...)
-	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), nil,
+	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), middleware.NewAuthMiddleware(nil), nil,
 		router.Handlers{
-			Health: handler.NewHealthHandler(svc),
-			Auth:   handler.NewAuthHandler(nil),
+			Health:    handler.NewHealthHandler(svc),
+			Auth:      handler.NewAuthHandler(nil, nil),
+			Protected: handler.NewProtectedHandler(),
 		})
 	if err != nil {
 		t.Fatal(err)
@@ -173,15 +179,16 @@ func TestVendorStoreRoutesMounted(t *testing.T) {
 	log := logger.New("debug", &logs)
 	mock := &storeHandlerMock{}
 
-	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), nil,
+	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), testAuthMiddleware(), nil,
 		router.Handlers{
 			Health: handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
-			Auth:   handler.NewAuthHandler(nil),
+			Auth:   handler.NewAuthHandler(nil, nil),
 			Store:  mock,
 		})
 	if err != nil {
 		t.Fatal(err)
 	}
+	do := vendorDo(t)
 
 	w := do(r, http.MethodGet, "/vendor/stores")
 	if w.Code != http.StatusOK || !mock.listCalled {
@@ -232,15 +239,16 @@ func TestVendorStoreRequestRoutesMounted(t *testing.T) {
 	log := logger.New("debug", &logs)
 	mock := &storeRequestHandlerMock{}
 
-	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), nil,
+	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), testAuthMiddleware(), nil,
 		router.Handlers{
 			Health:       handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
-			Auth:         handler.NewAuthHandler(nil),
+			Auth:         handler.NewAuthHandler(nil, nil),
 			StoreRequest: mock,
 		})
 	if err != nil {
 		t.Fatal(err)
 	}
+	do := vendorDo(t)
 
 	w := do(r, http.MethodGet, "/vendor/store-requests")
 	if w.Code != http.StatusOK || !mock.listCalled {
@@ -272,10 +280,10 @@ func TestPublicStoreRouteMounted(t *testing.T) {
 	log := logger.New("debug", &logs)
 	mock := &publicStoreHandlerMock{}
 
-	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), nil,
+	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), nil, nil,
 		router.Handlers{
 			Health:      handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
-			Auth:        handler.NewAuthHandler(nil),
+			Auth:        handler.NewAuthHandler(nil, nil),
 			PublicStore: mock,
 		})
 	if err != nil {
@@ -294,3 +302,107 @@ func TestPublicStoreRouteMounted(t *testing.T) {
 	}
 }
 
+// testSessions logs users in against an in-memory user store; the auth
+// middleware reloads them from it on every request.
+var testSessions = service.NewSessionService(memory.NewUserRepository(),
+	token.NewJWTManager(rbacSecret, rbacIssuer, time.Hour),
+	map[string]enum.Role{rbacVendorPhone: enum.RoleVendor, rbacAdminPhone: enum.RoleAdmin},
+	logger.New("error", io.Discard))
+
+func testAuthMiddleware() middlewareinterface.AuthMiddleware {
+	return middleware.NewAuthMiddleware(testSessions)
+}
+
+// roleToken logs in a real user with the given role and returns their token.
+func roleToken(t *testing.T, role enum.Role) string {
+	t.Helper()
+	phone := map[enum.Role]string{
+		enum.RoleCustomer: rbacCustomerPhone,
+		enum.RoleVendor:   rbacVendorPhone,
+		enum.RoleAdmin:    rbacAdminPhone,
+	}[role]
+	res, err := testSessions.Login(context.Background(), phone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res.AccessToken
+}
+
+// vendorDo is do() with a valid vendor token.
+func vendorDo(t *testing.T) func(r http.Handler, method, path string) *httptest.ResponseRecorder {
+	t.Helper()
+	tok := roleToken(t, enum.RoleVendor)
+	return func(r http.Handler, method, path string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, path, nil)
+		req.Header.Set("Authorization", "Bearer "+tok)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w
+	}
+}
+
+// Vendor routes must reject missing tokens and non-vendor roles before the
+// handler runs.
+func TestVendorRoutesRequireVendorRole(t *testing.T) {
+	log := logger.New("debug", &bytes.Buffer{})
+	stores, requests := &storeHandlerMock{}, &storeRequestHandlerMock{}
+	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), testAuthMiddleware(), nil,
+		router.Handlers{
+			Health:       handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
+			Auth:         handler.NewAuthHandler(nil, nil),
+			Store:        stores,
+			StoreRequest: requests,
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cases := map[string]struct {
+		header string
+		want   int
+	}{
+		"no token": {"", http.StatusUnauthorized},
+		"customer": {"Bearer " + roleToken(t, enum.RoleCustomer), http.StatusForbidden},
+		"admin":    {"Bearer " + roleToken(t, enum.RoleAdmin), http.StatusForbidden},
+	}
+	paths := []struct{ method, path string }{
+		{http.MethodGet, "/vendor/stores"},
+		{http.MethodGet, "/vendor/stores/s-1"},
+		{http.MethodPatch, "/vendor/stores/s-1"},
+		{http.MethodPut, "/vendor/stores/s-1"},
+		{http.MethodGet, "/vendor/store-requests"},
+		{http.MethodGet, "/vendor/store-requests/r-1"},
+		{http.MethodPost, "/vendor/store-requests"},
+	}
+	for name, tc := range cases {
+		for _, p := range paths {
+			req := httptest.NewRequest(p.method, p.path, nil)
+			if tc.header != "" {
+				req.Header.Set("Authorization", tc.header)
+			}
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			if w.Code != tc.want {
+				t.Errorf("%s %s %s: got %d, want %d", name, p.method, p.path, w.Code, tc.want)
+			}
+		}
+	}
+	if stores.listCalled || stores.getCalled || stores.updateCalled ||
+		requests.listCalled || requests.getCalled || requests.createCalled {
+		t.Fatal("a vendor handler ran without a vendor token")
+	}
+}
+
+// Without auth middleware the router must refuse to mount private routes.
+func TestRouterRefusesProtectedRoutesWithoutAuth(t *testing.T) {
+	log := logger.New("debug", &bytes.Buffer{})
+	_, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), nil, nil,
+		router.Handlers{
+			Health: handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
+			Auth:   handler.NewAuthHandler(nil, nil),
+			Store:  &storeHandlerMock{},
+		})
+	if err == nil {
+		t.Fatal("router.New accepted vendor routes without auth middleware")
+	}
+}

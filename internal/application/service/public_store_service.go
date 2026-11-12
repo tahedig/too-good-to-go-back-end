@@ -144,18 +144,18 @@ func (s *publicStoreService) GetPublicStore(ctx context.Context, publicID string
 	scheduleItems := buildPublicWorkingSchedule(store.WorkingHours)
 
 	return &dto.PublicStoreResponse{
-		PublicID:             store.PublicID,
-		Name:                 store.Name,
-		CategoryName:         store.CategoryName,
-		City:                 store.City,
-		District:             districtStr,
-		HeaderSubtitle:       headerSubtitle,
-		IsOpen:               isOpen,
-		StatusBadge:          statusBadge,
-		Biography:            store.Biography,
-		PickupAddress:        store.AddressLine,
-		PickupInstructions:   store.PickupInstructions,
-		PickupSummary:        pickupSummary,
+		PublicID:           store.PublicID,
+		Name:               store.Name,
+		CategoryName:       store.CategoryName,
+		City:               store.City,
+		District:           districtStr,
+		HeaderSubtitle:     headerSubtitle,
+		IsOpen:             isOpen,
+		StatusBadge:        statusBadge,
+		Biography:          store.Biography,
+		PickupAddress:      store.AddressLine,
+		PickupInstructions: store.PickupInstructions,
+		PickupSummary:      pickupSummary,
 		Location: dto.StoreLocationResponse{
 			Latitude:  store.Location.Latitude,
 			Longitude: store.Location.Longitude,
@@ -259,4 +259,3 @@ func toPersianDigits(s string) string {
 	)
 	return r.Replace(s)
 }
-

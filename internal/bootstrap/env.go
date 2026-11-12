@@ -1,6 +1,8 @@
 package bootstrap
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
@@ -10,6 +12,8 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+
+	"github.com/tahedig/too-good-to-go/backend/pkg/validation"
 )
 
 type Config struct {
@@ -51,6 +55,22 @@ type Config struct {
 	RedisURL string
 	// RedisKeyPrefix namespaces every key, so environments can share a Redis.
 	RedisKeyPrefix string
+
+	// DatabaseURL (postgres://user:pass@host:port/db?sslmode=...) stores users
+	// and their roles. Required outside development; when empty in
+	// development users are kept in process memory.
+	DatabaseURL string
+
+	// JWTSecret signs access tokens (HS256). Required outside development;
+	// in development an ephemeral random secret is generated when unset.
+	JWTSecret    string
+	JWTIssuer    string
+	JWTAccessTTL time.Duration
+
+	// AdminPhones and VendorPhones (E.164) get that role when they log in for
+	// the first time; every other new user is a customer.
+	AdminPhones  []string
+	VendorPhones []string
 
 	// TrustedProxies is the list of proxy IPs/CIDRs allowed to set
 	// X-Forwarded-For. Empty means no proxy is trusted.
@@ -94,10 +114,20 @@ func LoadConfig() (*Config, error) {
 		AuthRateWindow:      p.duration("AUTH_RATE_WINDOW", time.Minute),
 		RedisURL:            p.string("REDIS_URL", ""),
 		RedisKeyPrefix:      p.string("REDIS_KEY_PREFIX", "tgtg:"),
+		DatabaseURL:         p.string("DATABASE_URL", ""),
+		JWTSecret:           p.string("JWT_SECRET", ""),
+		JWTIssuer:           p.string("JWT_ISSUER", AppName),
+		JWTAccessTTL:        p.duration("JWT_ACCESS_TTL", time.Hour),
+		AdminPhones:         p.phones("ADMIN_PHONES"),
+		VendorPhones:        p.phones("VENDOR_PHONES"),
 		TrustedProxies:      p.list("TRUSTED_PROXIES"),
 	}
+	p.jwtSecret(cfg)
 	if cfg.RedisURL == "" && cfg.AppEnv != EnvDevelopment {
 		p.errs = append(p.errs, errors.New("REDIS_URL is required when APP_ENV is not development"))
+	}
+	if cfg.DatabaseURL == "" && cfg.AppEnv != EnvDevelopment {
+		p.errs = append(p.errs, errors.New("DATABASE_URL is required when APP_ENV is not development"))
 	}
 	if cfg.OTPExposeCode && cfg.IsProduction() {
 		p.errs = append(p.errs, errors.New("OTP_EXPOSE_CODE must not be enabled in production"))
@@ -162,6 +192,41 @@ func (p *envParser) port(key string, def int) int {
 		return def
 	}
 	return n
+}
+
+// phones parses a comma separated list of phone numbers into E.164.
+func (p *envParser) phones(key string) []string {
+	var out []string
+	for _, raw := range p.list(key) {
+		n, err := validation.NormalizePhone(raw)
+		if err != nil {
+			p.errs = append(p.errs, fmt.Errorf("%s contains an invalid phone number %q", key, raw))
+			continue
+		}
+		out = append(out, n)
+	}
+	return out
+}
+
+const minJWTSecretLen = 32
+
+func (p *envParser) jwtSecret(cfg *Config) {
+	if cfg.JWTSecret == "" {
+		if cfg.AppEnv != EnvDevelopment {
+			p.errs = append(p.errs, errors.New("JWT_SECRET is required when APP_ENV is not development"))
+			return
+		}
+		b := make([]byte, 32)
+		if _, err := rand.Read(b); err != nil {
+			p.errs = append(p.errs, fmt.Errorf("generate development JWT secret: %w", err))
+			return
+		}
+		cfg.JWTSecret = hex.EncodeToString(b) // tokens stop working on restart
+		return
+	}
+	if len(cfg.JWTSecret) < minJWTSecretLen {
+		p.errs = append(p.errs, fmt.Errorf("JWT_SECRET must be at least %d characters", minJWTSecretLen))
+	}
 }
 
 func (p *envParser) intRange(key string, def, lo, hi int) int {
