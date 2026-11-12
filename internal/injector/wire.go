@@ -21,6 +21,7 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 		provideStorage,
 		provideRateLimiter,
 		provideSMSSender,
+		provideDatabase,
 		provideUserRepository,
 
 		// application

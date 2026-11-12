@@ -63,6 +63,7 @@ func (h *authHandler) RequestOTP(c *gin.Context) {
 // @Param        body body dto.VerifyOTPRequest true "Phone number and code"
 // @Success      200 {object} dto.VerifyOTPResponse
 // @Failure      400 {object} dto.ErrorResponse
+// @Failure      403 {object} dto.ErrorResponse "FORBIDDEN: the account is suspended or deleted"
 // @Failure      413 {object} dto.ErrorResponse
 // @Failure      429 {object} dto.ErrorResponse "OTP_ATTEMPTS_EXCEEDED or TOO_MANY_REQUESTS"
 // @Router       /auth/otp/verify [post]

@@ -134,6 +134,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "FORBIDDEN: the account is suspended or deleted",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "413": {
                         "description": "Request Entity Too Large",
                         "schema": {

@@ -27,22 +27,29 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 		return nil, nil, err
 	}
 	rateLimiter := provideRateLimiter(injectorStorage)
-	healthService := provideHealthService(cfg, log, version, injectorStorage)
+	injectorDatabase, cleanup2, err := provideDatabase(cfg, log)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	healthService := provideHealthService(cfg, log, version, injectorStorage, injectorDatabase)
 	healthHandler := handler.NewHealthHandler(healthService)
 	smsSender := provideSMSSender(cfg, log)
 	authService := provideAuthService(cfg, log, injectorStorage, smsSender)
-	userRepository := provideUserRepository(log)
+	userRepository := provideUserRepository(injectorDatabase)
 	sessionService := provideSessionService(cfg, log, userRepository, tokenManager)
 	authHandler := handler.NewAuthHandler(authService, sessionService)
 	protectedHandler := handler.NewProtectedHandler()
 	handlers := provideHandlers(healthHandler, authHandler, protectedHandler)
 	engine, err := router.New(cfg, log, errorHandler, authMiddleware, rateLimiter, handlers)
 	if err != nil {
+		cleanup2()
 		cleanup()
 		return nil, nil, err
 	}
 	app := newApp(engine, healthService)
 	return app, func() {
+		cleanup2()
 		cleanup()
 	}, nil
 }

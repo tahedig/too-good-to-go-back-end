@@ -47,6 +47,11 @@ func (s *sessionService) Login(ctx context.Context, verifiedPhone string) (*serv
 	if err != nil {
 		return nil, exception.NewInternalServer(err)
 	}
+	if !user.CanLogin() {
+		logger.FromContext(ctx, s.log).Warn("login refused for inactive account",
+			"phone", validation.MaskPhone(phone), "user_id", user.ID, "status", string(user.Status))
+		return nil, exception.NewForbidden("this account is not active")
+	}
 	accessToken, expiresIn, err := s.tokens.Issue(user)
 	if err != nil {
 		return nil, exception.NewInternalServer(err)
@@ -70,6 +75,7 @@ func (s *sessionService) findOrCreateUser(ctx context.Context, phone string) (*m
 		ID:        id,
 		Phone:     phone,
 		Role:      role,
+		Status:    model.UserStatusActive,
 		CreatedAt: s.now().UTC(),
 	})
 }

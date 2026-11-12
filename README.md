@@ -73,6 +73,7 @@ go build -ldflags "-X main.version=v0.1.0" -o bin/api ./cmd/api
 | `AUTH_RATE_WINDOW` | `1m` | Window for `AUTH_RATE_LIMIT` |
 | `REDIS_URL` | (none) | `redis://[:password@]host:port/db` (`rediss://` for TLS). Stores OTPs and rate-limit counters. **Required** when `APP_ENV` is not `development`; unset in development falls back to process memory |
 | `REDIS_KEY_PREFIX` | `tgtg:` | Prefix for every Redis key, so environments can share one Redis |
+| `DATABASE_URL` | (none) | `postgres://user:pass@host:5432/db?sslmode=disable`. Stores users and their roles. **Required** when `APP_ENV` is not `development`; unset in development falls back to process memory (users are lost on restart) |
 | `JWT_SECRET` | (random in development) | HS256 signing secret, min 32 chars. **Required** when `APP_ENV` is not `development`; unset in development generates a random one per start |
 | `JWT_ISSUER` | `too-good-to-go-backend` | `iss` claim, checked on every request |
 | `JWT_ACCESS_TTL` | `1h` | Access token lifetime |
@@ -195,10 +196,46 @@ algorithm, or an unknown role gets `401 UNAUTHORIZED`; a valid token with the
 wrong role gets `403 FORBIDDEN`.
 
 Tokens are issued by `POST /auth/otp/verify`, which calls
-`SessionService.Login` once the code is accepted. It loads or creates the user (users
-are kept in memory until the Postgres repository exists); new users are
-`customer` unless their number is in `ADMIN_PHONES` / `VENDOR_PHONES`. Roles of
-existing users are never changed on login.
+`SessionService.Login` once the code is accepted. It loads or creates the user;
+new users are `customer` unless their number is in `ADMIN_PHONES` /
+`VENDOR_PHONES`. Roles of existing users are never changed on login.
+
+### Users in PostgreSQL
+
+With `DATABASE_URL` set, users live in the `users`, `roles` and `user_roles`
+tables from `migrations/`. Apply them before starting the server:
+
+```bash
+make migrate-up DB_URL="postgres://app:app@localhost:5432/tgtg?sslmode=disable"
+```
+
+The server checks the schema at startup and refuses to start with
+`database schema is missing or outdated` if the migrations were not applied.
+`/health` reports `postgres` once it is connected.
+
+- **IDs.** Tokens and API responses carry `users.public_id` (UUID). The numeric
+  `users.id` never leaves the database.
+- **First login** inserts the user and grants one role: `customer`,
+  `vendor_owner` (for `VENDOR_PHONES`) or `admin` (for `ADMIN_PHONES`). It is a
+  single `INSERT ... ON CONFLICT (phone)`, so parallel first logins create one
+  user. `last_login_at` is updated on every successful login.
+- **Roles.** The token holds one role: the strongest the user has in
+  `user_roles` (`admin` > `vendor_owner`/`vendor_staff` → `vendor` >
+  `customer`). `support` has no API role yet and is ignored. Roles granted in
+  the database apply from the next login.
+- **Status.** `suspended` or `deleted` users get `403 FORBIDDEN`
+  (`this account is not active`) and no token.
+
+OTP codes stay in Redis (the `otp_codes` table is not used): they are
+short-lived and Redis expires them on its own.
+
+Integration tests run against a real database when `TEST_DATABASE_URL` is set
+(each test creates and drops its own schema, so any empty database works);
+otherwise they are skipped:
+
+```bash
+TEST_DATABASE_URL="postgres://app:app@localhost:5432/tgtg_test?sslmode=disable"   go test ./internal/infrastructure/repository/postgres/
+```
 
 To protect a new route:
 

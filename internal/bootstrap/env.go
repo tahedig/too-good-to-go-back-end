@@ -56,6 +56,11 @@ type Config struct {
 	// RedisKeyPrefix namespaces every key, so environments can share a Redis.
 	RedisKeyPrefix string
 
+	// DatabaseURL (postgres://user:pass@host:port/db?sslmode=...) stores users
+	// and their roles. Required outside development; when empty in
+	// development users are kept in process memory.
+	DatabaseURL string
+
 	// JWTSecret signs access tokens (HS256). Required outside development;
 	// in development an ephemeral random secret is generated when unset.
 	JWTSecret    string
@@ -109,6 +114,7 @@ func LoadConfig() (*Config, error) {
 		AuthRateWindow:      p.duration("AUTH_RATE_WINDOW", time.Minute),
 		RedisURL:            p.string("REDIS_URL", ""),
 		RedisKeyPrefix:      p.string("REDIS_KEY_PREFIX", "tgtg:"),
+		DatabaseURL:         p.string("DATABASE_URL", ""),
 		JWTSecret:           p.string("JWT_SECRET", ""),
 		JWTIssuer:           p.string("JWT_ISSUER", AppName),
 		JWTAccessTTL:        p.duration("JWT_ACCESS_TTL", time.Hour),
@@ -119,6 +125,9 @@ func LoadConfig() (*Config, error) {
 	p.jwtSecret(cfg)
 	if cfg.RedisURL == "" && cfg.AppEnv != EnvDevelopment {
 		p.errs = append(p.errs, errors.New("REDIS_URL is required when APP_ENV is not development"))
+	}
+	if cfg.DatabaseURL == "" && cfg.AppEnv != EnvDevelopment {
+		p.errs = append(p.errs, errors.New("DATABASE_URL is required when APP_ENV is not development"))
 	}
 	if cfg.OTPExposeCode && cfg.IsProduction() {
 		p.errs = append(p.errs, errors.New("OTP_EXPOSE_CODE must not be enabled in production"))

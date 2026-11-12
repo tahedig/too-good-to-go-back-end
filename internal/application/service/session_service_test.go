@@ -2,10 +2,14 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/enum"
+	"github.com/tahedig/too-good-to-go/backend/internal/domain/exception"
+	"github.com/tahedig/too-good-to-go/backend/internal/domain/model"
+	"github.com/tahedig/too-good-to-go/backend/internal/domain/repository"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/repository/memory"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/token"
 )
@@ -68,5 +72,33 @@ func TestLoginRejectsInvalidPhone(t *testing.T) {
 	svc, _ := newSessionService()
 	if _, err := svc.Login(context.Background(), "nope"); err == nil {
 		t.Fatal("invalid phone must be rejected")
+	}
+}
+
+// statusRepo returns a stored user with a fixed status, like a database row.
+type statusRepo struct{ status model.UserStatus }
+
+func (r statusRepo) FindOrCreateByPhone(_ context.Context, u *model.User) (*model.User, error) {
+	cp := *u
+	cp.Status = r.status
+	return &cp, nil
+}
+
+var _ repository.UserRepository = statusRepo{}
+
+func TestLoginRefusesInactiveAccounts(t *testing.T) {
+	tokens := token.NewJWTManager("test-secret-test-secret-test-secret-123", "test", time.Hour)
+	for _, status := range []model.UserStatus{model.UserStatusSuspended, model.UserStatusDeleted} {
+		svc := NewSessionService(statusRepo{status: status}, tokens, nil, discard)
+		res, err := svc.Login(context.Background(), customerPhone)
+		var appErr exception.AppError
+		if res != nil || !errors.As(err, &appErr) || appErr.Code() != exception.CodeForbidden {
+			t.Errorf("%s: got %+v, %v; want 403", status, res, err)
+		}
+	}
+
+	svc := NewSessionService(statusRepo{status: model.UserStatusActive}, tokens, nil, discard)
+	if _, err := svc.Login(context.Background(), customerPhone); err != nil {
+		t.Fatalf("active user must log in: %v", err)
 	}
 }

@@ -16,6 +16,8 @@ import (
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/enum"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/repository"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/repository/memory"
+	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/repository/postgres"
+	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/repository/postgres/driver"
 	redisrepo "github.com/tahedig/too-good-to-go/backend/internal/infrastructure/repository/redis"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/sms"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/token"
@@ -80,8 +82,9 @@ func provideStorage(cfg *bootstrap.Config, log *slog.Logger) (*storage, func(), 
 
 func provideRateLimiter(store *storage) serviceinterface.RateLimiter { return store.limiter }
 
-func provideHealthService(cfg *bootstrap.Config, log *slog.Logger, version string, store *storage) serviceinterface.HealthService {
-	return service.NewHealthService(version, cfg.HealthCheckTimeout, log, store.checkers...)
+func provideHealthService(cfg *bootstrap.Config, log *slog.Logger, version string, store *storage, db *database) serviceinterface.HealthService {
+	checkers := append(append([]serviceinterface.HealthChecker{}, db.checkers...), store.checkers...)
+	return service.NewHealthService(version, cfg.HealthCheckTimeout, log, checkers...)
 }
 
 func provideSMSSender(cfg *bootstrap.Config, log *slog.Logger) serviceinterface.SMSSender {
@@ -108,12 +111,45 @@ func provideAuthService(
 	}, log)
 }
 
-// provideUserRepository keeps users in memory until the Postgres repository
-// exists: accounts (and their IDs) are lost on restart.
-func provideUserRepository(log *slog.Logger) repository.UserRepository {
-	log.Warn("users are kept in memory: accounts are lost on restart and are not shared between instances")
-	return memory.NewUserRepository()
+// database is everything that moves from memory to PostgreSQL when
+// DATABASE_URL is set.
+type database struct {
+	users    repository.UserRepository
+	checkers []serviceinterface.HealthChecker
 }
+
+const dbConnectTimeout = 5 * time.Second
+
+// provideDatabase connects to PostgreSQL and checks the migrations were
+// applied, or falls back to memory when DATABASE_URL is empty (bootstrap only
+// allows that in development). The cleanup closes the pool after the HTTP
+// server stopped.
+func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func(), error) {
+	if cfg.DatabaseURL == "" {
+		log.Warn("DATABASE_URL is not set: users are kept in memory, are lost on restart and are not shared between instances")
+		return &database{users: memory.NewUserRepository()}, func() {}, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), dbConnectTimeout)
+	defer cancel()
+	pool, err := driver.NewPool(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := postgres.VerifySchema(ctx, pool); err != nil {
+		pool.Close()
+		return nil, nil, err
+	}
+	connCfg := pool.Config().ConnConfig
+	log.Info("connected to postgres", "host", connCfg.Host, "port", connCfg.Port, "database", connCfg.Database)
+
+	return &database{
+		users:    postgres.NewUserRepository(pool),
+		checkers: []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
+	}, pool.Close, nil
+}
+
+func provideUserRepository(db *database) repository.UserRepository { return db.users }
 
 // providePhoneRoles maps ADMIN_PHONES / VENDOR_PHONES to the role a new user
 // with that phone receives. Admin wins if a phone is in both lists.
