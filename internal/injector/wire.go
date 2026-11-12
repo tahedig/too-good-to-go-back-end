@@ -21,11 +21,13 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 		provideStorage,
 		provideRateLimiter,
 		provideSMSSender,
+		provideUserRepository,
 
 		// application
 		provideHealthService,
 		provideTokenManager,
 		provideAuthService,
+		provideSessionService,
 
 		// presentation
 		handler.NewHealthHandler,

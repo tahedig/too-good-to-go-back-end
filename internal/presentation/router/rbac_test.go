@@ -49,7 +49,7 @@ func newRBACEnv(t *testing.T) *rbacEnv {
 
 	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), middleware.NewAuthMiddleware(tokens), nil, router.Handlers{
 		Health:    handler.NewHealthHandler(health),
-		Auth:      handler.NewAuthHandler(nil),
+		Auth:      handler.NewAuthHandler(nil, nil),
 		Protected: handler.NewProtectedHandler(),
 	})
 	if err != nil {

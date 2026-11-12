@@ -11,11 +11,14 @@ import (
 )
 
 type authHandler struct {
-	svc serviceinterface.AuthService
+	svc      serviceinterface.AuthService
+	sessions serviceinterface.SessionService
 }
 
-func NewAuthHandler(svc serviceinterface.AuthService) handlerinterface.AuthHandler {
-	return &authHandler{svc: svc}
+// NewAuthHandler wires the OTP endpoints. A successful verify logs the user
+// in through sessions and returns an access token.
+func NewAuthHandler(svc serviceinterface.AuthService, sessions serviceinterface.SessionService) handlerinterface.AuthHandler {
+	return &authHandler{svc: svc, sessions: sessions}
 }
 
 // RequestOTP godoc
@@ -52,8 +55,8 @@ func (h *authHandler) RequestOTP(c *gin.Context) {
 }
 
 // VerifyOTP godoc
-// @Summary      Verify a one-time password
-// @Description  Checks the code and consumes it on success. A malformed code is rejected without using up an attempt.
+// @Summary      Verify a one-time password and log in
+// @Description  Checks the code and consumes it on success, then logs the user in (creating the account on first login) and returns a JWT access token. A malformed code is rejected without using up an attempt.
 // @Tags         auth
 // @Accept       json
 // @Produce      json
@@ -76,6 +79,24 @@ func (h *authHandler) VerifyOTP(c *gin.Context) {
 		return
 	}
 
+	// The phone is now proven, so open a session for it.
+	session, err := h.sessions.Login(c.Request.Context(), res.Phone)
+	if err != nil {
+		abortWithError(c, err)
+		return
+	}
+
 	c.Header("Cache-Control", "no-store")
-	c.JSON(http.StatusOK, dto.VerifyOTPResponse{Verified: true, Phone: res.Phone})
+	c.JSON(http.StatusOK, dto.VerifyOTPResponse{
+		Verified:    true,
+		Phone:       res.Phone,
+		AccessToken: session.AccessToken,
+		TokenType:   "Bearer",
+		ExpiresIn:   int(session.ExpiresIn.Seconds()),
+		User: dto.AuthUserInfo{
+			ID:    session.User.ID,
+			Phone: session.User.Phone,
+			Role:  string(session.User.Role),
+		},
+	})
 }

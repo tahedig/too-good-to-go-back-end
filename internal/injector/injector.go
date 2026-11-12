@@ -13,6 +13,7 @@ import (
 	"github.com/tahedig/too-good-to-go/backend/internal/application/service"
 	serviceinterface "github.com/tahedig/too-good-to-go/backend/internal/application/service/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/bootstrap"
+	"github.com/tahedig/too-good-to-go/backend/internal/domain/enum"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/repository"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/repository/memory"
 	redisrepo "github.com/tahedig/too-good-to-go/backend/internal/infrastructure/repository/redis"
@@ -105,6 +106,35 @@ func provideAuthService(
 		ResendCooldown: cfg.OTPResendCooldown,
 		ExposeCode:     cfg.OTPExposeCode,
 	}, log)
+}
+
+// provideUserRepository keeps users in memory until the Postgres repository
+// exists: accounts (and their IDs) are lost on restart.
+func provideUserRepository(log *slog.Logger) repository.UserRepository {
+	log.Warn("users are kept in memory: accounts are lost on restart and are not shared between instances")
+	return memory.NewUserRepository()
+}
+
+// providePhoneRoles maps ADMIN_PHONES / VENDOR_PHONES to the role a new user
+// with that phone receives. Admin wins if a phone is in both lists.
+func providePhoneRoles(cfg *bootstrap.Config) map[string]enum.Role {
+	roles := make(map[string]enum.Role, len(cfg.AdminPhones)+len(cfg.VendorPhones))
+	for _, p := range cfg.VendorPhones {
+		roles[p] = enum.RoleVendor
+	}
+	for _, p := range cfg.AdminPhones {
+		roles[p] = enum.RoleAdmin
+	}
+	return roles
+}
+
+func provideSessionService(
+	cfg *bootstrap.Config,
+	log *slog.Logger,
+	users repository.UserRepository,
+	tokens serviceinterface.TokenManager,
+) serviceinterface.SessionService {
+	return service.NewSessionService(users, tokens, providePhoneRoles(cfg), log)
 }
 
 func provideHandlers(

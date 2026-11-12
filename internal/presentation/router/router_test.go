@@ -39,7 +39,7 @@ func newTestRouter(t *testing.T, logs *bytes.Buffer, checkers ...serviceinterfac
 	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), middleware.NewAuthMiddleware(nil), nil,
 		router.Handlers{
 			Health:    handler.NewHealthHandler(svc),
-			Auth:      handler.NewAuthHandler(nil),
+			Auth:      handler.NewAuthHandler(nil, nil),
 			Protected: handler.NewProtectedHandler(),
 		})
 	if err != nil {
@@ -181,7 +181,7 @@ func TestVendorStoreRoutesMounted(t *testing.T) {
 	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), testAuthMiddleware(), nil,
 		router.Handlers{
 			Health: handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
-			Auth:   handler.NewAuthHandler(nil),
+			Auth:   handler.NewAuthHandler(nil, nil),
 			Store:  mock,
 		})
 	if err != nil {
@@ -241,7 +241,7 @@ func TestVendorStoreRequestRoutesMounted(t *testing.T) {
 	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), testAuthMiddleware(), nil,
 		router.Handlers{
 			Health:       handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
-			Auth:         handler.NewAuthHandler(nil),
+			Auth:         handler.NewAuthHandler(nil, nil),
 			StoreRequest: mock,
 		})
 	if err != nil {
@@ -282,7 +282,7 @@ func TestPublicStoreRouteMounted(t *testing.T) {
 	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), nil, nil,
 		router.Handlers{
 			Health:      handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
-			Auth:        handler.NewAuthHandler(nil),
+			Auth:        handler.NewAuthHandler(nil, nil),
 			PublicStore: mock,
 		})
 	if err != nil {
@@ -331,7 +331,7 @@ func TestVendorRoutesRequireVendorRole(t *testing.T) {
 	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), testAuthMiddleware(), nil,
 		router.Handlers{
 			Health:       handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
-			Auth:         handler.NewAuthHandler(nil),
+			Auth:         handler.NewAuthHandler(nil, nil),
 			Store:        stores,
 			StoreRequest: requests,
 		})
@@ -381,7 +381,7 @@ func TestRouterRefusesProtectedRoutesWithoutAuth(t *testing.T) {
 	_, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), nil, nil,
 		router.Handlers{
 			Health: handler.NewHealthHandler(service.NewHealthService("test", time.Second, log)),
-			Auth:   handler.NewAuthHandler(nil),
+			Auth:   handler.NewAuthHandler(nil, nil),
 			Store:  &storeHandlerMock{},
 		})
 	if err == nil {

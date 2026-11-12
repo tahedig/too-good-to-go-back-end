@@ -86,12 +86,30 @@ only `.env.example` (placeholders and defaults) is tracked.
 ## OTP authentication
 
 Login is passwordless: the client requests a one-time code by SMS, then
-verifies it.
+verifies it. A successful verify logs the user in (creating the account on
+first login) and returns a JWT access token.
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `POST` | `/auth/otp/request` | none | `{"phone": "09123456789"}` sends a code. Iranian local, `98...` and E.164 formats are accepted |
-| `POST` | `/auth/otp/verify` | none | `{"phone": "...", "code": "123456"}` checks and consumes the code, returns `{"verified": true, "phone": "+98..."}` |
+| `POST` | `/auth/otp/verify` | none | `{"phone": "...", "code": "123456"}` checks and consumes the code, then returns a session (below) |
+
+Successful verify response:
+
+```json
+{
+  "verified": true,
+  "phone": "+989123456789",
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "user": { "id": "5f0c6d1e-...", "phone": "+989123456789", "role": "customer" }
+}
+```
+
+Send the token as `Authorization: Bearer <access_token>`. `expires_in` is in
+seconds (`JWT_ACCESS_TTL`); there is no refresh token yet, so log in again
+after it expires.
 
 Error codes clients should handle:
 
@@ -170,13 +188,14 @@ Protected routes require an HS256 access token:
 | `GET` | `/test/customer` | `customer` | RBAC test route |
 | `GET` | `/test/vendor` | `vendor` | RBAC test route |
 | `GET` | `/test/admin` | `admin` | RBAC test route |
+| any | `/vendor/stores...`, `/vendor/store-requests...` | `vendor` | Vendor store management |
 
 A missing, malformed, expired or wrongly signed token, a wrong issuer or
 algorithm, or an unknown role gets `401 UNAUTHORIZED`; a valid token with the
 wrong role gets `403 FORBIDDEN`.
 
-Tokens are issued by `SessionService.Login` for a phone number that was
-already verified by another factor (OTP). It loads or creates the user (users
+Tokens are issued by `POST /auth/otp/verify`, which calls
+`SessionService.Login` once the code is accepted. It loads or creates the user (users
 are kept in memory until the Postgres repository exists); new users are
 `customer` unless their number is in `ADMIN_PHONES` / `VENDOR_PHONES`. Roles of
 existing users are never changed on login.
