@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -47,10 +48,8 @@ func (s *sessionService) Login(ctx context.Context, verifiedPhone string) (*serv
 	if err != nil {
 		return nil, exception.NewInternalServer(err)
 	}
-	if !user.CanLogin() {
-		logger.FromContext(ctx, s.log).Warn("login refused for inactive account",
-			"phone", validation.MaskPhone(phone), "user_id", user.ID, "status", string(user.Status))
-		return nil, exception.NewForbidden("this account is not active")
+	if err := s.checkAccess(ctx, user, "login"); err != nil {
+		return nil, err
 	}
 	accessToken, expiresIn, err := s.tokens.Issue(user)
 	if err != nil {
@@ -60,6 +59,41 @@ func (s *sessionService) Login(ctx context.Context, verifiedPhone string) (*serv
 	logger.FromContext(ctx, s.log).Info("session issued",
 		"phone", validation.MaskPhone(phone), "user_id", user.ID, "role", string(user.Role))
 	return &serviceinterface.AuthResult{User: user, AccessToken: accessToken, ExpiresIn: expiresIn}, nil
+}
+
+func (s *sessionService) Authenticate(ctx context.Context, accessToken string) (*model.User, error) {
+	claims, err := s.tokens.Parse(accessToken)
+	if err != nil {
+		return nil, exception.NewUnauthorized("invalid or expired token")
+	}
+	user, err := s.users.FindByID(ctx, claims.UserID)
+	if errors.Is(err, repository.ErrUserNotFound) {
+		return nil, exception.NewUnauthorized("invalid or expired token")
+	}
+	if err != nil {
+		return nil, exception.NewInternalServer(err)
+	}
+	if err := s.checkAccess(ctx, user, "request"); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+// checkAccess refuses inactive accounts and accounts without an application
+// role. A missing role is never replaced by a default one: granting access
+// must always be explicit.
+func (s *sessionService) checkAccess(ctx context.Context, user *model.User, action string) error {
+	if !user.CanLogin() {
+		logger.FromContext(ctx, s.log).Warn(action+" refused for inactive account",
+			"user_id", user.ID, "status", string(user.Status))
+		return exception.NewForbidden("this account is not active")
+	}
+	if !user.Role.Valid() {
+		logger.FromContext(ctx, s.log).Warn(action+" refused for account without a role",
+			"user_id", user.ID)
+		return exception.NewForbidden("this account has no role assigned")
+	}
+	return nil
 }
 
 func (s *sessionService) findOrCreateUser(ctx context.Context, phone string) (*model.User, error) {

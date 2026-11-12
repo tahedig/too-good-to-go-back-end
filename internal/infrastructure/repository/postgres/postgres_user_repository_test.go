@@ -15,6 +15,7 @@ import (
 
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/enum"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/model"
+	"github.com/tahedig/too-good-to-go/backend/internal/domain/repository"
 	"github.com/tahedig/too-good-to-go/backend/pkg/security"
 )
 
@@ -168,7 +169,8 @@ func TestPostgresNewUserRoles(t *testing.T) {
 }
 
 // Roles granted in the database (e.g. by an admin) decide the token role;
-// the strongest one wins and unmapped roles are ignored.
+// the strongest one wins and unmapped roles are ignored. A user left with no
+// mapped role gets an empty role, which the session service refuses.
 func TestPostgresRoleResolution(t *testing.T) {
 	ctx := context.Background()
 	pool := newTestPool(t, true)
@@ -182,7 +184,7 @@ func TestPostgresRoleResolution(t *testing.T) {
 		{"customer promoted to admin", []string{"admin"}, enum.RoleAdmin},
 		{"vendor staff", []string{"vendor_staff"}, enum.RoleVendor},
 		{"customer and vendor owner", []string{"vendor_owner"}, enum.RoleVendor},
-		{"support only adds nothing", []string{"support"}, enum.RoleCustomer},
+		{"support adds nothing", []string{"support"}, enum.RoleCustomer},
 	}
 	for i, tc := range cases {
 		phone := fmt.Sprintf("+98912000000%d", i)
@@ -201,6 +203,63 @@ SELECT u.id, r.id FROM users u, roles r WHERE u.public_id = $1::uuid AND r.code 
 		if err != nil || got.Role != tc.want {
 			t.Errorf("%s: got role %q err=%v, want %q", tc.name, got.Role, err, tc.want)
 		}
+	}
+}
+
+func TestPostgresUserWithoutRoleGetsNone(t *testing.T) {
+	ctx := context.Background()
+	pool := newTestPool(t, true)
+	repo := NewUserRepository(pool)
+
+	for i, keep := range [][]string{nil, {"support"}} {
+		phone := fmt.Sprintf("+98912300000%d", i)
+		u, err := repo.FindOrCreateByPhone(ctx, newUser(t, phone, enum.RoleCustomer))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.Exec(ctx, `DELETE FROM user_roles WHERE user_id = (SELECT id FROM users WHERE public_id = $1::uuid)`, u.ID); err != nil {
+			t.Fatal(err)
+		}
+		for _, code := range keep {
+			if _, err := pool.Exec(ctx, `
+INSERT INTO user_roles (user_id, role_id)
+SELECT u.id, r.id FROM users u, roles r WHERE u.public_id = $1::uuid AND r.code = $2`, u.ID, code); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		got, err := repo.FindOrCreateByPhone(ctx, newUser(t, phone, enum.RoleCustomer))
+		if err != nil || got.Role != "" {
+			t.Errorf("roles %v: FindOrCreateByPhone role %q err=%v, want none", keep, got.Role, err)
+		}
+		if got, err := repo.FindByID(ctx, u.ID); err != nil || got.Role != "" {
+			t.Errorf("roles %v: FindByID role %q err=%v, want none", keep, got.Role, err)
+		}
+	}
+}
+
+func TestPostgresFindByID(t *testing.T) {
+	ctx := context.Background()
+	pool := newTestPool(t, true)
+	repo := NewUserRepository(pool)
+
+	for _, id := range []string{"user-1", "7c9e6679-7425-40de-944b-e07fc1f90ae7"} {
+		if _, err := repo.FindByID(ctx, id); !errors.Is(err, repository.ErrUserNotFound) {
+			t.Fatalf("%s: got %v, want ErrUserNotFound", id, err)
+		}
+	}
+
+	u, err := repo.FindOrCreateByPhone(ctx, newUser(t, "+989123456789", enum.RoleVendor))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE users SET status = 'suspended' WHERE public_id = $1::uuid`, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, err := repo.FindByID(ctx, u.ID)
+	if err != nil || got.ID != u.ID || got.Phone != u.Phone || got.Role != enum.RoleVendor ||
+		got.Status != model.UserStatusSuspended || got.CreatedAt.IsZero() {
+		t.Fatalf("FindByID: %+v err=%v", got, err)
 	}
 }
 

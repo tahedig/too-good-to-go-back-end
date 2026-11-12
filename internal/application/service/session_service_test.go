@@ -84,6 +84,10 @@ func (r statusRepo) FindOrCreateByPhone(_ context.Context, u *model.User) (*mode
 	return &cp, nil
 }
 
+func (r statusRepo) FindByID(context.Context, string) (*model.User, error) {
+	return nil, repository.ErrUserNotFound
+}
+
 var _ repository.UserRepository = statusRepo{}
 
 func TestLoginRefusesInactiveAccounts(t *testing.T) {
@@ -101,4 +105,47 @@ func TestLoginRefusesInactiveAccounts(t *testing.T) {
 	if _, err := svc.Login(context.Background(), customerPhone); err != nil {
 		t.Fatalf("active user must log in: %v", err)
 	}
+}
+
+func wantStatus(t *testing.T, name string, err error, code string) {
+	t.Helper()
+	var appErr exception.AppError
+	if !errors.As(err, &appErr) || appErr.Code() != code {
+		t.Errorf("%s: got %v, want %s", name, err, code)
+	}
+}
+
+func TestAuthenticateReloadsUser(t *testing.T) {
+	ctx := context.Background()
+	users := memory.NewUserRepository()
+	tokens := token.NewJWTManager("test-secret-test-secret-test-secret-123", "test", time.Hour)
+	svc := NewSessionService(users, tokens, nil, discard)
+
+	res, err := svc.Login(ctx, customerPhone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := svc.Authenticate(ctx, res.AccessToken)
+	if err != nil || u.ID != res.User.ID || u.Role != enum.RoleCustomer {
+		t.Fatalf("fresh token: %+v err=%v", u, err)
+	}
+
+	_, err = svc.Authenticate(ctx, "not-a-token")
+	wantStatus(t, "garbage token", err, exception.CodeUnauthorized)
+
+	users.SetAccess(res.User.ID, enum.RoleCustomer, model.UserStatusSuspended)
+	_, err = svc.Authenticate(ctx, res.AccessToken)
+	wantStatus(t, "suspended", err, exception.CodeForbidden)
+
+	users.SetAccess(res.User.ID, "", model.UserStatusActive)
+	_, err = svc.Authenticate(ctx, res.AccessToken)
+	wantStatus(t, "no role", err, exception.CodeForbidden)
+
+	// Login is refused the same way: a missing role never becomes a default.
+	_, err = svc.Login(ctx, customerPhone)
+	wantStatus(t, "login without role", err, exception.CodeForbidden)
+
+	other := NewSessionService(memory.NewUserRepository(), tokens, nil, discard)
+	_, err = other.Authenticate(ctx, res.AccessToken)
+	wantStatus(t, "unknown user", err, exception.CodeUnauthorized)
 }

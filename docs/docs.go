@@ -41,6 +41,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN: the account is suspended, deleted or has no role",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
                     }
                 }
             }

@@ -18,6 +18,7 @@ import (
 	"github.com/tahedig/too-good-to-go/backend/internal/bootstrap"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/enum"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/exception"
+	"github.com/tahedig/too-good-to-go/backend/internal/domain/model"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/repository/memory"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/token"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/handler"
@@ -37,17 +38,19 @@ const (
 type rbacEnv struct {
 	r        *gin.Engine
 	sessions serviceinterface.SessionService
+	users    *memory.UserRepository
 }
 
 func newRBACEnv(t *testing.T) *rbacEnv {
 	t.Helper()
 	log := logger.New("debug", &bytes.Buffer{})
 	tokens := token.NewJWTManager(rbacSecret, rbacIssuer, time.Hour)
-	sessions := service.NewSessionService(memory.NewUserRepository(), tokens,
+	users := memory.NewUserRepository()
+	sessions := service.NewSessionService(users, tokens,
 		map[string]enum.Role{rbacVendorPhone: enum.RoleVendor, rbacAdminPhone: enum.RoleAdmin}, log)
 	health := service.NewHealthService("test", time.Second, log)
 
-	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), middleware.NewAuthMiddleware(tokens), nil, router.Handlers{
+	r, err := router.New(&bootstrap.Config{}, log, middleware.NewErrorHandler(log), middleware.NewAuthMiddleware(sessions), nil, router.Handlers{
 		Health:    handler.NewHealthHandler(health),
 		Auth:      handler.NewAuthHandler(nil, nil),
 		Protected: handler.NewProtectedHandler(),
@@ -55,7 +58,7 @@ func newRBACEnv(t *testing.T) *rbacEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &rbacEnv{r: r, sessions: sessions}
+	return &rbacEnv{r: r, sessions: sessions, users: users}
 }
 
 // login issues a real session for phone, as a verified login would.
@@ -170,4 +173,57 @@ func signToken(t *testing.T, secret, issuer string, role enum.Role, method jwt.S
 		t.Fatal(err)
 	}
 	return s
+}
+
+// A token stays signed and unexpired after its account is suspended, deleted
+// or loses its role; every request must still be refused from then on.
+func TestExistingTokenRefusedAfterAccessChange(t *testing.T) {
+	cases := []struct {
+		name     string
+		role     enum.Role
+		status   model.UserStatus
+		wantCode int
+	}{
+		{"suspended", enum.RoleCustomer, model.UserStatusSuspended, http.StatusForbidden},
+		{"deleted", enum.RoleCustomer, model.UserStatusDeleted, http.StatusForbidden},
+		{"role revoked", "", model.UserStatusActive, http.StatusForbidden},
+	}
+	for _, tc := range cases {
+		e := newRBACEnv(t)
+		session := e.login(t, rbacCustomerPhone)
+		if w := e.get("/auth/me", "Bearer "+session.AccessToken); w.Code != http.StatusOK {
+			t.Fatalf("%s: token must work before the change, got %d", tc.name, w.Code)
+		}
+
+		e.users.SetAccess(session.User.ID, tc.role, tc.status)
+		for _, path := range []string{"/auth/me", "/test/customer"} {
+			if w := e.get(path, "Bearer "+session.AccessToken); w.Code != tc.wantCode {
+				t.Errorf("%s %s: got %d %s, want %d", tc.name, path, w.Code, w.Body.String(), tc.wantCode)
+			}
+		}
+	}
+}
+
+// Role changes take effect on the next request: the stored role wins over
+// the one in the token.
+func TestStoredRoleOverridesTokenRole(t *testing.T) {
+	e := newRBACEnv(t)
+	session := e.login(t, rbacCustomerPhone)
+	e.users.SetAccess(session.User.ID, enum.RoleAdmin, model.UserStatusActive)
+
+	if w := e.get("/test/admin", "Bearer "+session.AccessToken); w.Code != http.StatusOK {
+		t.Fatalf("promoted user on /test/admin: got %d", w.Code)
+	}
+	if w := e.get("/test/customer", "Bearer "+session.AccessToken); w.Code != http.StatusForbidden {
+		t.Fatalf("promoted user keeps the old role: got %d", w.Code)
+	}
+}
+
+// A validly signed token for a user that does not exist is not a session.
+func TestTokenForUnknownUserReturns401(t *testing.T) {
+	e := newRBACEnv(t)
+	tok := signToken(t, rbacSecret, rbacIssuer, enum.RoleAdmin, jwt.SigningMethodHS256, time.Now().Add(time.Hour))
+	if w := e.get("/test/admin", "Bearer "+tok); w.Code != http.StatusUnauthorized {
+		t.Fatalf("got %d %s, want 401", w.Code, w.Body.String())
+	}
 }

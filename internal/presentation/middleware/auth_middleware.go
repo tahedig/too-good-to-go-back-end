@@ -15,11 +15,14 @@ import (
 )
 
 type authMiddleware struct {
-	tokens serviceinterface.TokenManager
+	sessions serviceinterface.SessionService
 }
 
-func NewAuthMiddleware(tokens serviceinterface.TokenManager) middlewareinterface.AuthMiddleware {
-	return &authMiddleware{tokens: tokens}
+// NewAuthMiddleware checks every request against the session service, which
+// reloads the user: a suspended account or a revoked role is refused at once,
+// not when the token expires.
+func NewAuthMiddleware(sessions serviceinterface.SessionService) middlewareinterface.AuthMiddleware {
+	return &authMiddleware{sessions: sessions}
 }
 
 func (m *authMiddleware) Authenticate() gin.HandlerFunc {
@@ -32,16 +35,16 @@ func (m *authMiddleware) Authenticate() gin.HandlerFunc {
 			return
 		}
 
-		claims, err := m.tokens.Parse(raw)
+		user, err := m.sessions.Authenticate(c.Request.Context(), raw)
 		if err != nil {
-			_ = c.Error(exception.NewUnauthorized("invalid or expired token"))
+			_ = c.Error(err)
 			c.Abort()
 			return
 		}
 
-		c.Set(bootstrap.CtxKeyUserID, claims.UserID)
-		c.Set(bootstrap.CtxKeyUserRole, string(claims.Role))
-		c.Request = c.Request.WithContext(logger.WithUserID(c.Request.Context(), claims.UserID))
+		c.Set(bootstrap.CtxKeyUserID, user.ID)
+		c.Set(bootstrap.CtxKeyUserRole, string(user.Role))
+		c.Request = c.Request.WithContext(logger.WithUserID(c.Request.Context(), user.ID))
 		c.Next()
 	}
 }

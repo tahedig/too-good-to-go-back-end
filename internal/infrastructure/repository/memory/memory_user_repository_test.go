@@ -2,11 +2,13 @@ package memory
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/enum"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/model"
+	"github.com/tahedig/too-good-to-go/backend/internal/domain/repository"
 )
 
 func TestFindOrCreateByPhone(t *testing.T) {
@@ -55,5 +57,25 @@ func TestFindOrCreateByPhoneIsAtomic(t *testing.T) {
 	wg.Wait()
 	if len(ids) != 1 {
 		t.Fatalf("parallel first logins created %d users, want 1", len(ids))
+	}
+}
+
+func TestFindByID(t *testing.T) {
+	ctx := context.Background()
+	repo := NewUserRepository()
+	if _, err := repo.FindByID(ctx, "u1"); !errors.Is(err, repository.ErrUserNotFound) {
+		t.Fatalf("missing user: got %v, want ErrUserNotFound", err)
+	}
+
+	_, _ = repo.FindOrCreateByPhone(ctx, &model.User{ID: "u1", Phone: "+989123456789", Role: enum.RoleCustomer, Status: model.UserStatusActive})
+	if !repo.SetAccess("u1", enum.RoleVendor, model.UserStatusSuspended) || repo.SetAccess("nobody", enum.RoleAdmin, "") {
+		t.Fatal("SetAccess must report whether the user exists")
+	}
+	u, err := repo.FindByID(ctx, "u1")
+	if err != nil || u.Role != enum.RoleVendor || u.Status != model.UserStatusSuspended {
+		t.Fatalf("FindByID must see the current state: %+v err=%v", u, err)
+	}
+	if again, _ := repo.FindOrCreateByPhone(ctx, &model.User{ID: "u2", Phone: "+989123456789"}); again.Status != model.UserStatusSuspended {
+		t.Fatal("lookups by phone and by id must share one record")
 	}
 }

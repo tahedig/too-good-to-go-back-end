@@ -438,6 +438,10 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: 'FORBIDDEN: the account is suspended, deleted or has no role'
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Identity from the access token (any authenticated role)

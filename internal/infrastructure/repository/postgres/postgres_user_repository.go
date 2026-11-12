@@ -14,6 +14,7 @@ import (
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/enum"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/model"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/repository"
+	"github.com/tahedig/too-good-to-go/backend/pkg/security"
 )
 
 // Role codes in the roles table (seeded by migration 000001). The table also
@@ -78,7 +79,7 @@ WHERE ur.user_id = $1`
 
 // FindOrCreateByPhone returns the user with newUser.Phone, creating it with
 // newUser's ID (as public_id) and role if the phone is new. The roles of an
-// existing user are never changed here.
+// existing user are never changed here; Role is empty if they hold none.
 func (r *userRepository) FindOrCreateByPhone(ctx context.Context, newUser *model.User) (*model.User, error) {
 	roleCode, ok := roleCodeFor[newUser.Role]
 	if !ok {
@@ -125,8 +126,16 @@ func (r *userRepository) FindOrCreateByPhone(ctx context.Context, newUser *model
 	return user, nil
 }
 
-func highestRole(ctx context.Context, tx pgx.Tx, userID int64) (enum.Role, error) {
-	rows, err := tx.Query(ctx, userRolesSQL, userID)
+// querier is satisfied by both *pgxpool.Pool and pgx.Tx.
+type querier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
+// highestRole returns the strongest application role the user holds, or ""
+// when none of their database roles maps to one (no roles left, or only
+// support). Callers must refuse such users rather than guess a role.
+func highestRole(ctx context.Context, q querier, userID int64) (enum.Role, error) {
+	rows, err := q.Query(ctx, userRolesSQL, userID)
 	if err != nil {
 		return "", fmt.Errorf("load user roles: %w", err)
 	}
@@ -135,15 +144,46 @@ func highestRole(ctx context.Context, tx pgx.Tx, userID int64) (enum.Role, error
 		return "", fmt.Errorf("load user roles: %w", err)
 	}
 
-	// A user without any mapped role (none granted, or only support) is a
-	// customer: the least privileged role.
-	best := enum.RoleCustomer
+	var best enum.Role
 	for _, code := range codes {
 		if role, ok := appRoleOf[code]; ok && roleRank[role] > roleRank[best] {
 			best = role
 		}
 	}
 	return best, nil
+}
+
+const findByIDSQL = `
+SELECT id, public_id::text, phone, status::text, created_at
+FROM users
+WHERE public_id = $1::uuid`
+
+// FindByID loads the current status and role of a user by public ID. It runs
+// on every authenticated request, so a suspended user or a revoked role takes
+// effect immediately instead of when the token expires.
+func (r *userRepository) FindByID(ctx context.Context, id string) (*model.User, error) {
+	if !security.IsID(id) {
+		return nil, repository.ErrUserNotFound
+	}
+	var (
+		dbID      int64
+		u         model.User
+		status    string
+		createdAt time.Time
+	)
+	err := r.pool.QueryRow(ctx, findByIDSQL, id).Scan(&dbID, &u.ID, &u.Phone, &status, &createdAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, repository.ErrUserNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("find user: %w", err)
+	}
+	u.Status = model.UserStatus(status)
+	u.CreatedAt = createdAt.UTC()
+	if u.Role, err = highestRole(ctx, r.pool, dbID); err != nil {
+		return nil, err
+	}
+	return &u, nil
 }
 
 // ErrSchemaMissing means the migrations have not been applied.

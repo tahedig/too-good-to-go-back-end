@@ -28,6 +28,7 @@ func respondIdentity(c *gin.Context) {
 // @Security BearerAuth
 // @Success  200 {object} dto.MeResponse
 // @Failure  401 {object} dto.ErrorResponse
+// @Failure  403 {object} dto.ErrorResponse "FORBIDDEN: the account is suspended, deleted or has no role"
 // @Router   /auth/me [get]
 func (h *protectedHandler) Me(c *gin.Context) { respondIdentity(c) }
 

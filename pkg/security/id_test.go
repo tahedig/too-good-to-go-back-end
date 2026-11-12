@@ -15,3 +15,20 @@ func TestNewID(t *testing.T) {
 		t.Fatal("ids must be unique")
 	}
 }
+
+func TestIsID(t *testing.T) {
+	id, _ := NewID()
+	for s, want := range map[string]bool{
+		id:                                     true,
+		"7C9E6679-7425-40DE-944B-E07FC1F90AE7": true,
+		"":                                     false,
+		"user-1":                               false,
+		"7c9e6679-7425-40de-944b-e07fc1f90ae":  false,
+		"7c9e6679x7425-40de-944b-e07fc1f90ae7": false,
+		"7c9e6679-7425-40de-944b-e07fc1f90aeg": false,
+	} {
+		if got := IsID(s); got != want {
+			t.Errorf("IsID(%q) = %v, want %v", s, got, want)
+		}
+	}
+}

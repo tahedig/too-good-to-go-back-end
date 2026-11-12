@@ -5,13 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/tahedig/too-good-to-go/backend/internal/application/dto"
 	"github.com/tahedig/too-good-to-go/backend/internal/application/service"
@@ -19,6 +19,7 @@ import (
 	"github.com/tahedig/too-good-to-go/backend/internal/bootstrap"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/enum"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/exception"
+	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/repository/memory"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/token"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/handler"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware"
@@ -301,13 +302,30 @@ func TestPublicStoreRouteMounted(t *testing.T) {
 	}
 }
 
+// testSessions logs users in against an in-memory user store; the auth
+// middleware reloads them from it on every request.
+var testSessions = service.NewSessionService(memory.NewUserRepository(),
+	token.NewJWTManager(rbacSecret, rbacIssuer, time.Hour),
+	map[string]enum.Role{rbacVendorPhone: enum.RoleVendor, rbacAdminPhone: enum.RoleAdmin},
+	logger.New("error", io.Discard))
+
 func testAuthMiddleware() middlewareinterface.AuthMiddleware {
-	return middleware.NewAuthMiddleware(token.NewJWTManager(rbacSecret, rbacIssuer, time.Hour))
+	return middleware.NewAuthMiddleware(testSessions)
 }
 
+// roleToken logs in a real user with the given role and returns their token.
 func roleToken(t *testing.T, role enum.Role) string {
 	t.Helper()
-	return signToken(t, rbacSecret, rbacIssuer, role, jwt.SigningMethodHS256, time.Now().Add(time.Hour))
+	phone := map[enum.Role]string{
+		enum.RoleCustomer: rbacCustomerPhone,
+		enum.RoleVendor:   rbacVendorPhone,
+		enum.RoleAdmin:    rbacAdminPhone,
+	}[role]
+	res, err := testSessions.Login(context.Background(), phone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res.AccessToken
 }
 
 // vendorDo is do() with a valid vendor token.

@@ -219,12 +219,18 @@ The server checks the schema at startup and refuses to start with
   `vendor_owner` (for `VENDOR_PHONES`) or `admin` (for `ADMIN_PHONES`). It is a
   single `INSERT ... ON CONFLICT (phone)`, so parallel first logins create one
   user. `last_login_at` is updated on every successful login.
-- **Roles.** The token holds one role: the strongest the user has in
+- **Roles.** A user acts with one role: the strongest they have in
   `user_roles` (`admin` > `vendor_owner`/`vendor_staff` → `vendor` >
-  `customer`). `support` has no API role yet and is ignored. Roles granted in
-  the database apply from the next login.
+  `customer`). `support` has no API role yet and is ignored. A user with no
+  mapped role is never given a default one: they get `403 FORBIDDEN`
+  (`this account has no role assigned`).
 - **Status.** `suspended` or `deleted` users get `403 FORBIDDEN`
   (`this account is not active`) and no token.
+- **Every request is checked.** `Authenticate` reloads the user by the token's
+  ID, so suspending a user, deleting them or changing their roles takes effect
+  on their next request, not when the token expires. The role used for access
+  checks is the stored one, not the one in the token. A token for a user that
+  no longer exists gets `401`.
 
 OTP codes stay in Redis (the `otp_codes` table is not used): they are
 short-lived and Redis expires them on its own.
