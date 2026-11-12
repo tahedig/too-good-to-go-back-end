@@ -6,6 +6,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	_ "github.com/tahedig/too-good-to-go/backend/docs"
+
 	serviceinterface "github.com/tahedig/too-good-to-go/backend/internal/application/service/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/bootstrap"
 	handlerinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/handler/interface"
@@ -16,7 +20,10 @@ import (
 // Handlers groups every HTTP handler. Add new feature handlers here.
 type Handlers struct {
 	Health handlerinterface.HealthHandler
-	Auth   handlerinterface.AuthHandler
+	Auth         handlerinterface.AuthHandler
+	Store        handlerinterface.StoreHandler
+	StoreRequest handlerinterface.StoreRequestHandler
+	PublicStore  handlerinterface.PublicStoreHandler
 }
 
 func New(
@@ -55,6 +62,7 @@ func New(
 
 	r.GET(bootstrap.HealthPath, h.Health.Health)
 	r.HEAD(bootstrap.HealthPath, h.Health.Health)
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	auth := r.Group("/auth/otp")
 	if limiter != nil && cfg.AuthRateLimit > 0 && cfg.AuthRateWindow > 0 {
@@ -64,6 +72,26 @@ func New(
 	}
 	auth.POST("/request", h.Auth.RequestOTP)
 	auth.POST("/verify", h.Auth.VerifyOTP)
+
+	if h.Store != nil {
+		vendor := r.Group("/vendor")
+		vendor.GET("/stores", h.Store.ListStores)
+		vendor.GET("/stores/:id", h.Store.GetStore)
+		vendor.PATCH("/stores/:id", h.Store.UpdateStore)
+		vendor.PUT("/stores/:id", h.Store.UpdateStore)
+	}
+
+	if h.StoreRequest != nil {
+		requests := r.Group("/vendor/store-requests")
+		requests.GET("", h.StoreRequest.ListStoreRequests)
+		requests.GET("/:id", h.StoreRequest.GetStoreRequest)
+		requests.POST("", h.StoreRequest.CreateStoreRequest)
+	}
+
+	if h.PublicStore != nil {
+		r.GET("/stores/:id", h.PublicStore.GetPublicStore)
+		r.HEAD("/stores/:id", h.PublicStore.GetPublicStore)
+	}
 
 	return r, nil
 }
