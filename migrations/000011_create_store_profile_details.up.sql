@@ -7,7 +7,6 @@ CREATE TABLE store_working_hours (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     store_id    BIGINT       NOT NULL,
     day_of_week SMALLINT     NOT NULL,
-    day_name_fa TEXT         NOT NULL,
     open_time   TIME         NOT NULL,
     close_time  TIME         NOT NULL,
     is_closed   BOOLEAN      NOT NULL DEFAULT false,
