@@ -203,21 +203,25 @@ func (r *userRepository) UpdateFullName(ctx context.Context, id, fullName string
 // ErrSchemaMissing means the migrations have not been applied.
 var ErrSchemaMissing = errors.New("database schema is missing or outdated: apply the migrations with `make migrate-up`")
 
+// requiredTables are the tables the repositories read or write.
+var requiredTables = []string{
+	"users", "roles", "user_roles",
+	"stores", "offers", "orders", "order_items", "payments",
+}
+
 // VerifySchema checks that the tables and seeded roles the repositories rely
 // on exist, so a database without migrations fails at startup with a clear
 // message instead of on the first login.
 func VerifySchema(ctx context.Context, pool *pgxpool.Pool) error {
 	// Tables first: a query naming a missing table fails to parse, so the
 	// roles count can only run once the tables are known to exist.
-	var tablesOK bool
-	err := pool.QueryRow(ctx, `
-SELECT to_regclass('users') IS NOT NULL
-   AND to_regclass('roles') IS NOT NULL
-   AND to_regclass('user_roles') IS NOT NULL`).Scan(&tablesOK)
+	var missing int
+	err := pool.QueryRow(ctx, `SELECT count(*) FROM unnest($1::text[]) AS t(name) WHERE to_regclass(t.name) IS NULL`,
+		requiredTables).Scan(&missing)
 	if err != nil {
 		return fmt.Errorf("verify database schema: %w", err)
 	}
-	if !tablesOK {
+	if missing > 0 {
 		return ErrSchemaMissing
 	}
 

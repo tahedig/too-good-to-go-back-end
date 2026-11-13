@@ -203,7 +203,11 @@ new users are `customer` unless their number is in `ADMIN_PHONES` /
 ### Users in PostgreSQL
 
 With `DATABASE_URL` set, users live in the `users`, `roles` and `user_roles`
-tables from `migrations/`. Apply them before starting the server:
+tables and orders in `orders`, `order_items` and `payments` (with `stores` and
+`offers`), all from `migrations/`. The migrations need the **PostGIS**
+extension (`stores.location`) and a superuser to create it; the
+`postgis/postgis:16-3.4` Docker image has it. Apply them before starting the
+server:
 
 ```bash
 make migrate-up DB_URL="postgres://app:app@localhost:5432/tgtg?sslmode=disable"
@@ -251,6 +255,55 @@ group := r.Group("/vendor", authMW.Authenticate(), authMW.RequireRoles(enum.Role
 
 Handlers read the caller with `c.GetString(bootstrap.CtxKeyUserID)` and
 `c.GetString(bootstrap.CtxKeyUserRole)`.
+
+## My orders
+
+`GET /orders` returns the signed-in user's order history, newest first. Any
+role may call it (vendors and admins can buy too); the query is always scoped
+to the caller, so other users' orders can never be listed.
+
+| Query | Meaning |
+|---|---|
+| `group` | `all` (default), `upcoming` (`pending_payment`, `paid`, `ready`) or `past` (`completed`, `cancelled`, `expired`, `no_show`) |
+| `status` | comma-separated statuses, e.g. `completed,cancelled`; with `group`, only statuses in both apply |
+| `limit` | page size, 1-50 (default 20) |
+| `cursor` | `next_cursor` of the previous page |
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:8080/orders?group=upcoming&limit=10"
+```
+
+```json
+{
+  "orders": [{
+    "id": "787f7da2-dc02-4da1-aede-0656d14aac47",
+    "status": "paid",
+    "group": "upcoming",
+    "payment_status": "succeeded",
+    "store": { "id": "47c2b53a-...", "name": "نان صبحگاهی", "pickup_address": "تهران، خیابان ولیعصر، پلاک ۱۲" },
+    "items": [{ "title": "بسته شانسی نان", "offer_type": "surprise_bag", "quantity": 1, "unit_price": 40000 }],
+    "items_total": 40000, "service_fee": 0, "total_amount": 40000,
+    "pickup_start": "2026-11-13T14:30:00Z", "pickup_end": "2026-11-13T15:30:00Z",
+    "created_at": "2026-11-13T10:00:00Z"
+  }],
+  "next_cursor": null
+}
+```
+
+- Amounts are in Toman and times in UTC; the client formats them (Jalali
+  dates, "today").
+- `payment_status` is the latest payment attempt (`initiated`, `succeeded`,
+  `failed`), or `null` before payment starts. `reserved_until` (the payment
+  deadline) is only present for `pending_payment`.
+- The pickup window comes from the ordered offers; the store address is the
+  pickup address.
+- Pagination is keyset on `(created_at, id)`: pages stay stable while new
+  orders arrive. An empty history is `200` with `"orders": []`.
+- Invalid `group`, `status`, `limit` or `cursor` is `400` with the bad fields
+  in `details`.
+
+Without `DATABASE_URL` orders are kept in memory and the list starts empty:
+nothing creates orders yet.
 
 ## Error response format
 

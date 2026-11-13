@@ -7,6 +7,7 @@
 package injector
 
 import (
+	"github.com/tahedig/too-good-to-go/backend/internal/application/service"
 	"github.com/tahedig/too-good-to-go/backend/internal/bootstrap"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/handler"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware"
@@ -42,7 +43,10 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 	protectedHandler := handler.NewProtectedHandler()
 	profileService := provideProfileService(userRepository)
 	profileHandler := handler.NewProfileHandler(profileService)
-	handlers := provideHandlers(healthHandler, authHandler, protectedHandler, profileHandler)
+	orderRepository := provideOrderRepository(injectorDatabase)
+	orderService := service.NewOrderService(orderRepository)
+	orderHandler := handler.NewOrderHandler(orderService)
+	handlers := provideHandlers(healthHandler, authHandler, protectedHandler, profileHandler, orderHandler)
 	engine, err := router.New(cfg, log, errorHandler, authMiddleware, rateLimiter, handlers)
 	if err != nil {
 		cleanup2()

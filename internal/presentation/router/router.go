@@ -27,6 +27,7 @@ type Handlers struct {
 	Store        handlerinterface.StoreHandler
 	StoreRequest handlerinterface.StoreRequestHandler
 	PublicStore  handlerinterface.PublicStoreHandler
+	Order        handlerinterface.OrderHandler
 	Profile      handlerinterface.ProfileHandler
 }
 
@@ -78,7 +79,7 @@ func New(
 	auth.POST("/request", h.Auth.RequestOTP)
 	auth.POST("/verify", h.Auth.VerifyOTP)
 
-	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil || h.Profile != nil) {
+	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil || h.Profile != nil || h.Order != nil) {
 		// Refuse to start rather than serve private routes unauthenticated.
 		return nil, errors.New("router: auth middleware is required for protected routes")
 	}
@@ -115,6 +116,12 @@ func New(
 		customer.Use(authMW.Authenticate(), authMW.RequireRoles(enum.RoleCustomer))
 		customer.GET("/profile", h.Profile.GetProfile)
 		customer.PATCH("/profile", h.Profile.UpdateProfile)
+	}
+
+	// Any signed-in user may list their own orders: a vendor or admin can
+	// also buy, and the query is always scoped to the caller.
+	if h.Order != nil {
+		r.GET("/orders", authMW.Authenticate(), h.Order.ListMyOrders)
 	}
 
 	if h.PublicStore != nil {
