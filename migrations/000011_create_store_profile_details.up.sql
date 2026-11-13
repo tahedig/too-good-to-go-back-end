@@ -17,7 +17,6 @@ CREATE TABLE store_working_hours (
     CONSTRAINT store_working_hours_day_chk         CHECK (day_of_week BETWEEN 0 AND 6),
     CONSTRAINT store_working_hours_store_day_key   UNIQUE (store_id, day_of_week)
 );
-CREATE INDEX idx_store_working_hours_store ON store_working_hours(store_id);
 
 CREATE TRIGGER trg_store_working_hours_updated
     BEFORE UPDATE ON store_working_hours
