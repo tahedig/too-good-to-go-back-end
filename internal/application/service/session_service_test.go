@@ -88,6 +88,10 @@ func (r statusRepo) FindByID(context.Context, string) (*model.User, error) {
 	return nil, repository.ErrUserNotFound
 }
 
+func (statusRepo) UpdateFullName(context.Context, string, string) error {
+	return repository.ErrUserNotFound
+}
+
 var _ repository.UserRepository = statusRepo{}
 
 func TestLoginRefusesInactiveAccounts(t *testing.T) {

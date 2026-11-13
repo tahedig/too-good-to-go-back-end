@@ -41,10 +41,12 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 	authService := provideAuthService(cfg, log, injectorStorage, smsSender)
 	authHandler := handler.NewAuthHandler(authService, sessionService)
 	protectedHandler := handler.NewProtectedHandler()
+	profileService := provideProfileService(userRepository)
+	profileHandler := handler.NewProfileHandler(profileService)
 	orderRepository := provideOrderRepository(injectorDatabase)
 	orderService := service.NewOrderService(orderRepository)
 	orderHandler := handler.NewOrderHandler(orderService)
-	handlers := provideHandlers(healthHandler, authHandler, protectedHandler, orderHandler)
+	handlers := provideHandlers(healthHandler, authHandler, protectedHandler, profileHandler, orderHandler)
 	engine, err := router.New(cfg, log, errorHandler, authMiddleware, rateLimiter, handlers)
 	if err != nil {
 		cleanup2()

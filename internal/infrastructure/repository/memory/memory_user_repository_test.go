@@ -79,3 +79,21 @@ func TestFindByID(t *testing.T) {
 		t.Fatal("lookups by phone and by id must share one record")
 	}
 }
+
+func TestUpdateFullName(t *testing.T) {
+	ctx := context.Background()
+	repo := NewUserRepository()
+	if err := repo.UpdateFullName(ctx, "missing", "Sam"); !errors.Is(err, repository.ErrUserNotFound) {
+		t.Fatalf("missing user: got %v, want ErrUserNotFound", err)
+	}
+	_, _ = repo.FindOrCreateByPhone(ctx, &model.User{
+		ID: "u1", Phone: "+989123456789", Role: enum.RoleCustomer, FullName: "Initial",
+	})
+	if err := repo.UpdateFullName(ctx, "u1", "Updated"); err != nil {
+		t.Fatal(err)
+	}
+	u, err := repo.FindByID(ctx, "u1")
+	if err != nil || u.FullName != "Updated" || u.Phone != "+989123456789" || u.Role != enum.RoleCustomer {
+		t.Fatalf("unexpected updated user: %+v err=%v", u, err)
+	}
+}

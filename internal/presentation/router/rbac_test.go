@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -54,6 +55,7 @@ func newRBACEnv(t *testing.T) *rbacEnv {
 		Health:    handler.NewHealthHandler(health),
 		Auth:      handler.NewAuthHandler(nil, nil),
 		Protected: handler.NewProtectedHandler(),
+		Profile:   handler.NewProfileHandler(service.NewProfileService(users)),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -81,6 +83,17 @@ func (e *rbacEnv) get(path, authHeader string) *httptest.ResponseRecorder {
 	return w
 }
 
+func (e *rbacEnv) patch(path, authHeader, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPatch, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	if authHeader != "" {
+		req.Header.Set("Authorization", authHeader)
+	}
+	w := httptest.NewRecorder()
+	e.r.ServeHTTP(w, req)
+	return w
+}
+
 func TestMeReturnsTokenIdentity(t *testing.T) {
 	e := newRBACEnv(t)
 	session := e.login(t, rbacCustomerPhone)
@@ -92,6 +105,54 @@ func TestMeReturnsTokenIdentity(t *testing.T) {
 	}
 	if me.UserID != session.User.ID || me.Role != string(enum.RoleCustomer) {
 		t.Fatalf("identity mismatch: %+v vs user %+v", me, session.User)
+	}
+}
+
+func TestCustomerCanReadAndUpdateOwnProfile(t *testing.T) {
+	e := newRBACEnv(t)
+	session := e.login(t, rbacCustomerPhone)
+	auth := "Bearer " + session.AccessToken
+
+	w := e.get("/customer/profile", auth)
+	var profile dto.ProfileResponse
+	if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &profile) != nil {
+		t.Fatalf("GET /customer/profile: %d %s", w.Code, w.Body.String())
+	}
+	if profile.UserID != session.User.ID || profile.Phone != rbacCustomerPhone || profile.DisplayName != "" {
+		t.Fatalf("unexpected profile: %+v", profile)
+	}
+
+	w = e.patch("/customer/profile", auth,
+		`{"display_name":"  Sam Example  ","phone":"+989111111111","role":"admin","status":"deleted"}`)
+	if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &profile) != nil {
+		t.Fatalf("PATCH /customer/profile: %d %s", w.Code, w.Body.String())
+	}
+	if profile.UserID != session.User.ID || profile.Phone != rbacCustomerPhone || profile.DisplayName != "Sam Example" {
+		t.Fatalf("update changed protected fields or failed: %+v", profile)
+	}
+
+	w = e.get("/customer/profile", auth)
+	if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &profile) != nil || profile.DisplayName != "Sam Example" {
+		t.Fatalf("profile update was not persisted: %d %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCustomerProfileRequiresCustomerAuthenticationAndValidName(t *testing.T) {
+	e := newRBACEnv(t)
+	if w := e.get("/customer/profile", ""); w.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated profile read: %d", w.Code)
+	}
+	vendor := e.login(t, rbacVendorPhone)
+	if w := e.get("/customer/profile", "Bearer "+vendor.AccessToken); w.Code != http.StatusForbidden {
+		t.Fatalf("vendor profile read: %d", w.Code)
+	}
+
+	customer := e.login(t, rbacCustomerPhone)
+	for _, body := range []string{`{"display_name":" "}`, `{"display_name":"` + strings.Repeat("x", 101) + `"}`} {
+		w := e.patch("/customer/profile", "Bearer "+customer.AccessToken, body)
+		if w.Code != http.StatusBadRequest || decodeError(t, w).Code != exception.CodeBadRequest {
+			t.Errorf("invalid profile update: %d %s", w.Code, w.Body.String())
+		}
 	}
 }
 

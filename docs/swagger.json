@@ -154,6 +154,96 @@
                 }
             }
         },
+        "/customer/profile": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "customer"
+                ],
+                "summary": "Get the customer profile",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ProfileResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "customer"
+                ],
+                "summary": "Update the customer display name",
+                "parameters": [
+                    {
+                        "description": "Profile update payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateProfileRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ProfileResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "200 when the service and all its dependencies are healthy, 503 otherwise (including during shutdown).",
@@ -956,6 +1046,23 @@
                 }
             }
         },
+        "dto.ProfileResponse": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string",
+                    "example": "Sam Example"
+                },
+                "phone": {
+                    "type": "string",
+                    "example": "+989123456789"
+                },
+                "user_id": {
+                    "type": "string",
+                    "example": "5f0c6d1e-8b7a-4c1e-9a3f-2d4b6c8e0a12"
+                }
+            }
+        },
         "dto.PublicOfferResponse": {
             "type": "object",
             "properties": {
@@ -1312,6 +1419,14 @@
                 "working_hours_summary": {
                     "type": "string",
                     "example": "شنبه تا چهارشنبه · ۰۸:۰۰ تا ۱۹:۰۰"
+                }
+            }
+        },
+        "dto.UpdateProfileRequest": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string"
                 }
             }
         },

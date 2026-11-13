@@ -177,11 +177,16 @@ func provideSessionService(
 	return service.NewSessionService(users, tokens, providePhoneRoles(cfg), log)
 }
 
+func provideProfileService(users repository.UserRepository) serviceinterface.ProfileService {
+	return service.NewProfileService(users)
+}
+
 func provideHandlers(
 	health handlerinterface.HealthHandler,
 	auth handlerinterface.AuthHandler,
 	protected handlerinterface.ProtectedHandler,
+	profile handlerinterface.ProfileHandler,
 	order handlerinterface.OrderHandler,
 ) router.Handlers {
-	return router.Handlers{Health: health, Auth: auth, Protected: protected, Order: order}
+	return router.Handlers{Health: health, Auth: auth, Protected: protected, Profile: profile, Order: order}
 }
