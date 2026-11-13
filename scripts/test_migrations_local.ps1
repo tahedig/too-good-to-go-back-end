@@ -12,7 +12,7 @@ $ErrorActionPreference = "Continue"
 $TestDb  = "tgtg_migrate_test"
 $Base    = $AdminUrl.Substring(0, $AdminUrl.LastIndexOf("/"))
 $TestUrl = "$Base/${TestDb}?sslmode=disable"
-$Tables     = "16"
+$Tables     = "19"
 $Migrations = (Get-ChildItem migrations -Filter *.up.sql).Count
 
 function Fail($msg) { Write-Host "FAIL: $msg" -ForegroundColor Red; exit 1 }

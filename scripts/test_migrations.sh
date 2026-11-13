@@ -21,7 +21,7 @@ psql_q() { docker exec "$NAME" psql -U postgres -d tgtg -tAc "$1"; }
 # Base tables only: PostGIS adds the spatial_ref_sys table and some views.
 count_tables() { psql_q "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name NOT IN ('schema_migrations', 'spatial_ref_sys')"; }
 MIGRATIONS=$(ls migrations/*.up.sql | wc -l | tr -d ' ')
-TABLES=16
+TABLES=19
 
 echo "==> UP"
 $MIGRATE up

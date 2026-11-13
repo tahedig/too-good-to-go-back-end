@@ -17,7 +17,7 @@ psql_q()  { psql "$TEST_URL"  -v ON_ERROR_STOP=1 -tAc "$1"; }
 # Base tables only: PostGIS adds the spatial_ref_sys table and some views.
 count_tables() { psql_q "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name NOT IN ('schema_migrations', 'spatial_ref_sys')"; }
 MIGRATIONS=$(ls migrations/*.up.sql | wc -l | tr -d ' ')
-TABLES=16
+TABLES=19
 
 cleanup() { admin_q "DROP DATABASE IF EXISTS ${TEST_DB} WITH (FORCE)" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
