@@ -21,6 +21,7 @@ type User struct {
 	// leaves the repository.
 	ID        string
 	Phone     string // E.164, unique
+	FullName  string
 	Role      enum.Role
 	Status    UserStatus
 	CreatedAt time.Time

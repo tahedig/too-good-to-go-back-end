@@ -263,6 +263,28 @@ func TestPostgresFindByID(t *testing.T) {
 	}
 }
 
+func TestPostgresUpdateFullName(t *testing.T) {
+	ctx := context.Background()
+	pool := newTestPool(t, true)
+	repo := NewUserRepository(pool)
+	user := newUser(t, "+989123456789", enum.RoleCustomer)
+	user.FullName = "Initial Name"
+	if _, err := repo.FindOrCreateByPhone(ctx, user); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repo.UpdateFullName(ctx, user.ID, "Updated Name"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := repo.FindByID(ctx, user.ID)
+	if err != nil || got.FullName != "Updated Name" || got.Phone != user.Phone || got.Role != user.Role {
+		t.Fatalf("updated user = %+v, %v", got, err)
+	}
+	if err := repo.UpdateFullName(ctx, "00000000-0000-0000-0000-000000000000", "No user"); !errors.Is(err, repository.ErrUserNotFound) {
+		t.Fatalf("missing user update: got %v, want ErrUserNotFound", err)
+	}
+}
+
 func TestPostgresInactiveUserIsReturnedWithStatus(t *testing.T) {
 	ctx := context.Background()
 	pool := newTestPool(t, true)

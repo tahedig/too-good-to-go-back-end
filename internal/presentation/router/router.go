@@ -27,6 +27,7 @@ type Handlers struct {
 	Store        handlerinterface.StoreHandler
 	StoreRequest handlerinterface.StoreRequestHandler
 	PublicStore  handlerinterface.PublicStoreHandler
+	Profile      handlerinterface.ProfileHandler
 }
 
 func New(
@@ -77,7 +78,7 @@ func New(
 	auth.POST("/request", h.Auth.RequestOTP)
 	auth.POST("/verify", h.Auth.VerifyOTP)
 
-	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil) {
+	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil || h.Profile != nil) {
 		// Refuse to start rather than serve private routes unauthenticated.
 		return nil, errors.New("router: auth middleware is required for protected routes")
 	}
@@ -107,6 +108,13 @@ func New(
 		vendor.GET("/store-requests", h.StoreRequest.ListStoreRequests)
 		vendor.GET("/store-requests/:id", h.StoreRequest.GetStoreRequest)
 		vendor.POST("/store-requests", h.StoreRequest.CreateStoreRequest)
+	}
+
+	if h.Profile != nil {
+		customer := r.Group("/customer")
+		customer.Use(authMW.Authenticate(), authMW.RequireRoles(enum.RoleCustomer))
+		customer.GET("/profile", h.Profile.GetProfile)
+		customer.PATCH("/profile", h.Profile.UpdateProfile)
 	}
 
 	if h.PublicStore != nil {
