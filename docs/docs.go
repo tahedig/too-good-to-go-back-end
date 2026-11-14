@@ -15,6 +15,42 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/auth/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Identity from the access token (any authenticated role)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN: the account is suspended, deleted or has no role",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/otp/request": {
             "post": {
                 "description": "Sends an OTP by SMS to the phone number. The code is never returned, except as debug_code when OTP_EXPOSE_CODE is enabled outside production.",
@@ -69,7 +105,7 @@ const docTemplate = `{
         },
         "/auth/otp/verify": {
             "post": {
-                "description": "Checks the code and consumes it on success. A malformed code is rejected without using up an attempt.",
+                "description": "Checks the code and consumes it on success, then logs the user in (creating the account on first login) and returns a JWT access token. A malformed code is rejected without using up an attempt.",
                 "consumes": [
                     "application/json"
                 ],
@@ -79,7 +115,7 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Verify a one-time password",
+                "summary": "Verify a one-time password and log in",
                 "parameters": [
                     {
                         "description": "Phone number and code",
@@ -104,6 +140,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "FORBIDDEN: the account is suspended or deleted",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "413": {
                         "description": "Request Entity Too Large",
                         "schema": {
@@ -112,6 +154,96 @@ const docTemplate = `{
                     },
                     "429": {
                         "description": "OTP_ATTEMPTS_EXCEEDED or TOO_MANY_REQUESTS",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/customer/profile": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "customer"
+                ],
+                "summary": "Get the customer profile",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ProfileResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "customer"
+                ],
+                "summary": "Update the customer display name",
+                "parameters": [
+                    {
+                        "description": "Profile update payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateProfileRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ProfileResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -821,6 +953,86 @@ const docTemplate = `{
                 }
             }
         },
+        "/orders": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Order history of the signed-in user, newest first, with cursor pagination. Only the caller's own orders are returned. upcoming = pending_payment, paid, ready; past = completed, cancelled, expired, no_show. An empty history is 200 with an empty list.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "orders"
+                ],
+                "summary": "List my orders",
+                "parameters": [
+                    {
+                        "enum": [
+                            "all",
+                            "upcoming",
+                            "past"
+                        ],
+                        "type": "string",
+                        "description": "all (default), upcoming or past",
+                        "name": "group",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated statuses, e.g. completed,cancelled. Combined with group, only statuses in both apply.",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size, 1-50 (default 20)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "next_cursor from the previous page",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.OrderListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: invalid group, status, limit or cursor",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN: the account is suspended, deleted or has no role",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/stores/{id}": {
             "get": {
                 "description": "Returns public store information, schedule, and available food offers for eligible stores. Unknown or unavailable stores return 404 without exposing private fields.",
@@ -1015,6 +1227,114 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/test/admin": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rbac"
+                ],
+                "summary": "Admin-only test route",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/test/customer": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rbac"
+                ],
+                "summary": "Customer-only test route",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/test/vendor": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rbac"
+                ],
+                "summary": "Vendor-only test route",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -1337,6 +1657,28 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "dto.AuthUserInfo": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "5f0c6d1e-8b7a-4c1e-9a3f-2d4b6c8e0a12"
+                },
+                "phone": {
+                    "type": "string",
+                    "example": "+989123456789"
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "customer",
+                        "vendor",
+                        "admin"
+                    ],
+                    "example": "customer"
+                }
+            }
+        },
         "dto.CatalogueFiltersResponse": {
             "type": "object",
             "properties": {
@@ -1693,6 +2035,158 @@ const docTemplate = `{
                 "slug": {
                     "type": "string",
                     "example": "bakery"
+                }
+            }
+        },
+        "dto.MeResponse": {
+            "type": "object",
+            "properties": {
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "customer",
+                        "vendor",
+                        "admin"
+                    ],
+                    "example": "customer"
+                },
+                "user_id": {
+                    "type": "string",
+                    "example": "5f0c6d1e-8b7a-4c1e-9a3f-2d4b6c8e0a12"
+                }
+            }
+        },
+        "dto.OrderItemResponse": {
+            "type": "object",
+            "properties": {
+                "offer_type": {
+                    "description": "OfferType is surprise_bag or specific_item.",
+                    "type": "string",
+                    "example": "surprise_bag"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "title": {
+                    "type": "string",
+                    "example": "بسته شانسی نان"
+                },
+                "unit_price": {
+                    "type": "integer",
+                    "example": 40000
+                }
+            }
+        },
+        "dto.OrderListResponse": {
+            "type": "object",
+            "properties": {
+                "next_cursor": {
+                    "description": "NextCursor fetches the next page (?cursor=...); null on the last page.",
+                    "type": "string",
+                    "example": "MjAyNi0xMS0xM1QxMDowMDowMFp8N2M5ZTY2NzktNzQyNS00MGRlLTk0NGItZTA3ZmMxZjkwYWU3"
+                },
+                "orders": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.OrderResponse"
+                    }
+                }
+            }
+        },
+        "dto.OrderResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-11-13T10:00:00Z"
+                },
+                "group": {
+                    "description": "Group is \"upcoming\" or \"past\", matching the sections of the page.",
+                    "type": "string",
+                    "example": "upcoming"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.OrderItemResponse"
+                    }
+                },
+                "items_total": {
+                    "type": "integer",
+                    "example": 40000
+                },
+                "payment_status": {
+                    "description": "PaymentStatus of the latest attempt: initiated, succeeded or failed;\nnull when payment has not been started.",
+                    "type": "string",
+                    "example": "succeeded"
+                },
+                "pickup_end": {
+                    "type": "string",
+                    "example": "2026-11-13T15:30:00Z"
+                },
+                "pickup_start": {
+                    "type": "string",
+                    "example": "2026-11-13T14:30:00Z"
+                },
+                "reserved_until": {
+                    "description": "ReservedUntil is the payment deadline; set only for pending_payment.",
+                    "type": "string",
+                    "example": "2026-11-13T10:10:00Z"
+                },
+                "service_fee": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "status": {
+                    "description": "Status: pending_payment, paid, ready (upcoming) or completed,\ncancelled, expired, no_show (past).",
+                    "type": "string",
+                    "example": "paid"
+                },
+                "store": {
+                    "$ref": "#/definitions/dto.OrderStoreResponse"
+                },
+                "total_amount": {
+                    "type": "integer",
+                    "example": 40000
+                }
+            }
+        },
+        "dto.OrderStoreResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "نان صبحگاهی"
+                },
+                "pickup_address": {
+                    "type": "string",
+                    "example": "تهران، خیابان ولیعصر، پلاک ۱۲"
+                }
+            }
+        },
+        "dto.ProfileResponse": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string",
+                    "example": "Sam Example"
+                },
+                "phone": {
+                    "type": "string",
+                    "example": "+989123456789"
+                },
+                "user_id": {
+                    "type": "string",
+                    "example": "5f0c6d1e-8b7a-4c1e-9a3f-2d4b6c8e0a12"
                 }
             }
         },
@@ -2055,6 +2549,14 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.UpdateProfileRequest": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.UpdateStoreRequest": {
             "type": "object",
             "properties": {
@@ -2115,9 +2617,25 @@ const docTemplate = `{
         "dto.VerifyOTPResponse": {
             "type": "object",
             "properties": {
+                "access_token": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                },
+                "expires_in": {
+                    "description": "seconds",
+                    "type": "integer",
+                    "example": 3600
+                },
                 "phone": {
                     "type": "string",
                     "example": "+989123456789"
+                },
+                "token_type": {
+                    "type": "string",
+                    "example": "Bearer"
+                },
+                "user": {
+                    "$ref": "#/definitions/dto.AuthUserInfo"
                 },
                 "verified": {
                     "type": "boolean",

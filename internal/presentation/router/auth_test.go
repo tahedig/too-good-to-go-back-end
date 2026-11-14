@@ -12,20 +12,26 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/tahedig/too-good-to-go/backend/internal/application/dto"
 	"github.com/tahedig/too-good-to-go/backend/internal/application/service"
 	serviceinterface "github.com/tahedig/too-good-to-go/backend/internal/application/service/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/bootstrap"
+	"github.com/tahedig/too-good-to-go/backend/internal/domain/enum"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/exception"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/repository"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/repository/memory"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/sms"
+	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/token"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/handler"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/router"
 	"github.com/tahedig/too-good-to-go/backend/pkg/logger"
 )
 
-const testPhone = "+989123456789"
+const (
+	testPhone       = "+989123456789"
+	testVendorPhone = "+989121111111"
+)
 
 var codeRe = regexp.MustCompile(`\b\d{6}\b`)
 
@@ -54,11 +60,15 @@ func newAuthEnvWithStores(t *testing.T, cfg *bootstrap.Config, otpCfg service.OT
 	log := logger.New("debug", logs)
 	sender := sms.NewFakeSender(log, false) // production-style: body never logged
 	auth := service.NewAuthService(otps, sender, otpCfg, log)
+	tokens := token.NewJWTManager(rbacSecret, rbacIssuer, time.Hour)
+	sessions := service.NewSessionService(memory.NewUserRepository(), tokens,
+		map[string]enum.Role{testVendorPhone: enum.RoleVendor}, log)
 	health := service.NewHealthService("test", time.Second, log)
 
-	r, err := router.New(cfg, log, middleware.NewErrorHandler(log), limiter, router.Handlers{
-		Health: handler.NewHealthHandler(health),
-		Auth:   handler.NewAuthHandler(auth),
+	r, err := router.New(cfg, log, middleware.NewErrorHandler(log), middleware.NewAuthMiddleware(sessions), limiter, router.Handlers{
+		Health:    handler.NewHealthHandler(health),
+		Auth:      handler.NewAuthHandler(auth, sessions),
+		Protected: handler.NewProtectedHandler(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -117,12 +127,18 @@ func TestOTPRequestAndVerifySuccess(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("verify: %d %s", w.Code, w.Body.String())
 	}
-	var resp struct {
-		Verified bool   `json:"verified"`
-		Phone    string `json:"phone"`
-	}
+	var resp dto.VerifyOTPResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil || !resp.Verified || resp.Phone != testPhone {
 		t.Fatalf("unexpected verify response: %s", w.Body.String())
+	}
+	if resp.AccessToken == "" || resp.TokenType != "Bearer" || resp.ExpiresIn != 3600 {
+		t.Fatalf("verify must return a session: %s", w.Body.String())
+	}
+	if resp.User.ID == "" || resp.User.Phone != testPhone || resp.User.Role != string(enum.RoleCustomer) {
+		t.Fatalf("unexpected user in verify response: %+v", resp.User)
+	}
+	if cc := w.Header().Get("Cache-Control"); cc != "no-store" {
+		t.Fatalf("token response must not be cached, got Cache-Control %q", cc)
 	}
 
 	if bytes.Contains(e.logs.Bytes(), []byte(code)) {
@@ -211,4 +227,81 @@ func (e *authEnv) get(path string) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	e.r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
 	return w
+}
+
+func (e *authEnv) getAuth(path, token string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	w := httptest.NewRecorder()
+	e.r.ServeHTTP(w, req)
+	return w
+}
+
+// login runs the full OTP flow and returns the verify response.
+func (e *authEnv) login(t *testing.T, phone string) dto.VerifyOTPResponse {
+	t.Helper()
+	code, w := e.request(t, phone)
+	if w.Code != http.StatusOK {
+		t.Fatalf("request: %d %s", w.Code, w.Body.String())
+	}
+	w = e.verify(phone, code)
+	var resp dto.VerifyOTPResponse
+	if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &resp) != nil {
+		t.Fatalf("verify: %d %s", w.Code, w.Body.String())
+	}
+	return resp
+}
+
+// The token from an OTP login must open the protected routes for its role.
+func TestOTPLoginTokenAuthenticates(t *testing.T) {
+	e := newAuthEnv(t, time.Minute, 3)
+	session := e.login(t, testPhone)
+
+	w := e.getAuth("/auth/me", session.AccessToken)
+	var me dto.MeResponse
+	if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &me) != nil {
+		t.Fatalf("/auth/me: %d %s", w.Code, w.Body.String())
+	}
+	if me.UserID != session.User.ID || me.Role != string(enum.RoleCustomer) {
+		t.Fatalf("token identity %+v does not match login user %+v", me, session.User)
+	}
+	if w := e.getAuth("/test/customer", session.AccessToken); w.Code != http.StatusOK {
+		t.Fatalf("customer route: %d", w.Code)
+	}
+	if w := e.getAuth("/test/vendor", session.AccessToken); w.Code != http.StatusForbidden {
+		t.Fatalf("customer on vendor route: got %d, want 403", w.Code)
+	}
+}
+
+// Logging in twice with the same phone is the same user; phones listed as
+// vendor get the vendor role.
+func TestOTPLoginReusesUserAndAssignsRole(t *testing.T) {
+	e := newAuthEnv(t, time.Minute, 3)
+
+	first := e.login(t, testPhone)
+	second := e.login(t, "09123456789") // same phone, local format
+	if first.User.ID != second.User.ID {
+		t.Fatalf("second login created a new user: %s != %s", first.User.ID, second.User.ID)
+	}
+
+	vendor := e.login(t, testVendorPhone)
+	if vendor.User.Role != string(enum.RoleVendor) || vendor.User.ID == first.User.ID {
+		t.Fatalf("unexpected vendor user: %+v", vendor.User)
+	}
+	if w := e.getAuth("/test/vendor", vendor.AccessToken); w.Code != http.StatusOK {
+		t.Fatalf("vendor route with vendor token: %d %s", w.Code, w.Body.String())
+	}
+}
+
+// A failed verify must never return a token.
+func TestFailedVerifyIssuesNoToken(t *testing.T) {
+	e := newAuthEnv(t, time.Minute, 3)
+	code, _ := e.request(t, testPhone)
+
+	w := e.verify(testPhone, wrongCode(code))
+	if w.Code == http.StatusOK || strings.Contains(w.Body.String(), "access_token") {
+		t.Fatalf("wrong code returned a session: %d %s", w.Code, w.Body.String())
+	}
 }

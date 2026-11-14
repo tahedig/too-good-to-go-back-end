@@ -1,0 +1,12 @@
+DROP TRIGGER  IF EXISTS trg_offers_store_approved ON offers;
+DROP TRIGGER  IF EXISTS trg_offers_min_discount   ON offers;
+DROP TRIGGER  IF EXISTS trg_offers_updated        ON offers;
+DROP TABLE    IF EXISTS offers;
+DROP TRIGGER  IF EXISTS trg_templates_updated     ON offer_templates;
+DROP TABLE    IF EXISTS offer_templates;
+DROP FUNCTION IF EXISTS fn_offer_requires_approved_store();
+DROP FUNCTION IF EXISTS fn_offer_min_discount();
+DROP FUNCTION IF EXISTS fn_valid_allergen_list(allergen_type[]);
+DROP TYPE     IF EXISTS allergen_type;
+DROP TYPE     IF EXISTS offer_status;
+DROP TYPE     IF EXISTS offer_type;

@@ -12,3 +12,11 @@ linters:
     - misspell
     - staticcheck
     - unused
+  exclusions:
+    rules:
+      # ST1018 flags the zero-width non-joiner (U+200C, نیم‌فاصله), which is a
+      # normal part of Persian words such as "سه‌شنبه". Escaping it would make
+      # user-facing text unreadable, and it cannot be escaped in struct tags.
+      - linters:
+          - staticcheck
+        text: "ST1018"

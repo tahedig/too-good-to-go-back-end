@@ -112,6 +112,17 @@ func TestSecurityHeaders(t *testing.T) {
 				t.Errorf("%s: %s = %q, want %q", path, header, got, want)
 			}
 		}
+		if got := w.Header().Get("Content-Security-Policy"); got != "default-src 'none'; frame-ancestors 'none'" {
+			t.Errorf("%s: API responses must keep the strict CSP, got %q", path, got)
+		}
+	}
+
+	// Swagger UI must be able to run its scripts, or the page stays blank.
+	w := e.get("/swagger/index.html")
+	csp := w.Header().Get("Content-Security-Policy")
+	if w.Code != http.StatusOK || !strings.Contains(csp, "script-src 'self' 'unsafe-inline'") ||
+		!strings.Contains(csp, "frame-ancestors 'none'") {
+		t.Fatalf("/swagger/index.html: %d, CSP %q", w.Code, csp)
 	}
 }
 

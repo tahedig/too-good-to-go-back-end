@@ -38,6 +38,8 @@ func TestOTPAndRedisRules(t *testing.T) {
 		t.Setenv(k, "")
 		os.Unsetenv(k)
 	}
+	t.Setenv("JWT_SECRET", strings.Repeat("s", 32)) // production also requires it
+	t.Setenv("DATABASE_URL", "postgres://app:app@localhost:5432/tgtg")
 
 	if _, err := LoadConfig(); err != nil { // development: memory fallback is fine
 		t.Fatalf("development without REDIS_URL should load: %v", err)
@@ -63,6 +65,52 @@ func TestOTPAndRedisRules(t *testing.T) {
 	t.Setenv("OTP_EXPOSE_CODE", "maybe")
 	if _, err := LoadConfig(); err == nil || !strings.Contains(err.Error(), "OTP_EXPOSE_CODE") {
 		t.Fatalf("non-boolean OTP_EXPOSE_CODE must fail, got %v", err)
+	}
+}
+
+func TestJWTSecretRules(t *testing.T) {
+	t.Chdir(t.TempDir())
+	for _, k := range []string{"APP_ENV", "JWT_SECRET", "JWT_ISSUER", "ADMIN_PHONES"} {
+		t.Setenv(k, "")
+		os.Unsetenv(k)
+	}
+	t.Setenv("REDIS_URL", "redis://localhost:6379/0") // production also requires it
+	t.Setenv("DATABASE_URL", "postgres://app:app@localhost:5432/tgtg")
+
+	cfg, err := LoadConfig() // development: an ephemeral secret is generated
+	if err != nil || len(cfg.JWTSecret) < minJWTSecretLen {
+		t.Fatalf("development should get a generated secret, err=%v", err)
+	}
+
+	t.Setenv("APP_ENV", "production")
+	if _, err := LoadConfig(); err == nil || !strings.Contains(err.Error(), "JWT_SECRET") {
+		t.Fatalf("production without JWT_SECRET must fail, got %v", err)
+	}
+
+	t.Setenv("JWT_SECRET", "too-short")
+	if _, err := LoadConfig(); err == nil || !strings.Contains(err.Error(), "JWT_SECRET") {
+		t.Fatalf("short JWT_SECRET must fail, got %v", err)
+	}
+
+	t.Setenv("JWT_SECRET", strings.Repeat("k", 40))
+	t.Setenv("ADMIN_PHONES", "09121234567, +989129999999")
+	cfg, err = LoadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.AdminPhones) != 2 || cfg.AdminPhones[0] != "+989121234567" {
+		t.Fatalf("admin phones not normalized: %v", cfg.AdminPhones)
+	}
+
+	t.Setenv("ADMIN_PHONES", "nope")
+	if _, err := LoadConfig(); err == nil || !strings.Contains(err.Error(), "ADMIN_PHONES") {
+		t.Fatalf("invalid ADMIN_PHONES must fail, got %v", err)
+	}
+	t.Setenv("ADMIN_PHONES", "")
+
+	t.Setenv("JWT_ISSUER", "  ") // blank placeholder from .env.example
+	if cfg, err := LoadConfig(); err != nil || cfg.JWTIssuer != AppName {
+		t.Fatalf("blank JWT_ISSUER should use the default, got %q err=%v", cfg.JWTIssuer, err)
 	}
 }
 
@@ -119,8 +167,11 @@ func TestDotEnvDoesNotOverrideRealEnv(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("HTTP_PORT", "7000")                     // real env wins
-	t.Setenv("REDIS_URL", "redis://localhost:6379/0") // .env sets APP_ENV=staging
+	t.Setenv("HTTP_PORT", "7000") // real env wins
+	// .env sets APP_ENV=staging, which requires all of these:
+	t.Setenv("JWT_SECRET", strings.Repeat("s", 32))
+	t.Setenv("REDIS_URL", "redis://localhost:6379/0")
+	t.Setenv("DATABASE_URL", "postgres://app:app@localhost:5432/tgtg")
 	os.Unsetenv("LOG_LEVEL")
 	os.Unsetenv("APP_ENV")
 	t.Cleanup(func() { os.Unsetenv("LOG_LEVEL"); os.Unsetenv("APP_ENV") })
@@ -147,5 +198,27 @@ func TestLoadConfigReportsMalformedDotEnv(t *testing.T) {
 	_, err := LoadConfig()
 	if err == nil || !strings.Contains(err.Error(), ".env") {
 		t.Fatalf("expected a .env parsing error, got %v", err)
+	}
+}
+
+func TestDatabaseURLRules(t *testing.T) {
+	t.Chdir(t.TempDir()) // no .env
+	for _, k := range []string{"APP_ENV", "DATABASE_URL"} {
+		t.Setenv(k, "")
+	}
+	t.Setenv("JWT_SECRET", strings.Repeat("s", 32))
+	t.Setenv("REDIS_URL", "redis://localhost:6379/0")
+
+	if _, err := LoadConfig(); err != nil {
+		t.Fatalf("development without DATABASE_URL should load: %v", err)
+	}
+	t.Setenv("APP_ENV", "production")
+	if _, err := LoadConfig(); err == nil || !strings.Contains(err.Error(), "DATABASE_URL") {
+		t.Fatalf("production without DATABASE_URL must fail, got %v", err)
+	}
+	t.Setenv("DATABASE_URL", "postgres://app:app@localhost:5432/tgtg")
+	cfg, err := LoadConfig()
+	if err != nil || cfg.DatabaseURL != "postgres://app:app@localhost:5432/tgtg" {
+		t.Fatalf("production with DATABASE_URL should load: %v", err)
 	}
 }

@@ -249,15 +249,15 @@ func toStoreResponse(store *model.Store) dto.StoreResponse {
 	}
 
 	return dto.StoreResponse{
-		PublicID:            store.PublicID,
-		Name:                store.Name,
-		CategoryID:          store.CategoryID,
-		CategoryName:        store.CategoryName,
-		OwnerName:           store.OwnerName,
-		Phone:               store.Phone,
-		Biography:           store.Biography,
-		PickupAddress:       store.AddressLine,
-		PickupInstructions:  store.PickupInstructions,
+		PublicID:           store.PublicID,
+		Name:               store.Name,
+		CategoryID:         store.CategoryID,
+		CategoryName:       store.CategoryName,
+		OwnerName:          store.OwnerName,
+		Phone:              store.Phone,
+		Biography:          store.Biography,
+		PickupAddress:      store.AddressLine,
+		PickupInstructions: store.PickupInstructions,
 		Location: dto.StoreLocationResponse{
 			Latitude:  store.Location.Latitude,
 			Longitude: store.Location.Longitude,

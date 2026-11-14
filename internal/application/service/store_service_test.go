@@ -120,17 +120,17 @@ func TestStoreServiceGetStoreNotFound(t *testing.T) {
 
 func TestStoreServiceUpdateStore(t *testing.T) {
 	existing := &model.Store{
-		PublicID:            "store-1",
-		VendorID:            7,
-		VendorStatus:        "approved",
-		Name:                "Old Name",
-		Biography:           "Old biography",
-		PickupInstructions:  "Old instructions",
-		AddressLine:         "Old address",
-		RatingAvg:           4.5,
-		TrustScore:          90,
-		IsActive:            true,
-		AcceptsOrders:       true,
+		PublicID:           "store-1",
+		VendorID:           7,
+		VendorStatus:       "approved",
+		Name:               "Old Name",
+		Biography:          "Old biography",
+		PickupInstructions: "Old instructions",
+		AddressLine:        "Old address",
+		RatingAvg:          4.5,
+		TrustScore:         90,
+		IsActive:           true,
+		AcceptsOrders:      true,
 	}
 
 	repo := &storeRepositoryStub{store: existing}
