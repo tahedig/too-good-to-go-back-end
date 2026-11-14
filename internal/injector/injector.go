@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/tahedig/too-good-to-go/backend/internal/application/service"
 	serviceinterface "github.com/tahedig/too-good-to-go/backend/internal/application/service/interface"
@@ -22,6 +23,7 @@ import (
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/sms"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/token"
 	handlerinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/handler/interface"
+	middlewareinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/router"
 )
 
@@ -116,6 +118,7 @@ func provideAuthService(
 type database struct {
 	users    repository.UserRepository
 	orders   repository.OrderRepository
+	pool     *pgxpool.Pool
 	checkers []serviceinterface.HealthChecker
 }
 
@@ -147,6 +150,7 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 	return &database{
 		users:    postgres.NewUserRepository(pool),
 		orders:   postgres.NewOrderRepository(pool),
+		pool:     pool,
 		checkers: []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
 	}, pool.Close, nil
 }
@@ -184,9 +188,14 @@ func provideProfileService(users repository.UserRepository) serviceinterface.Pro
 func provideHandlers(
 	health handlerinterface.HealthHandler,
 	auth handlerinterface.AuthHandler,
+	catalogue handlerinterface.CatalogueHandler,
+	userAuth middlewareinterface.UserAuth,
 	protected handlerinterface.ProtectedHandler,
 	profile handlerinterface.ProfileHandler,
 	order handlerinterface.OrderHandler,
 ) router.Handlers {
-	return router.Handlers{Health: health, Auth: auth, Protected: protected, Profile: profile, Order: order}
+	return router.Handlers{
+		Health: health, Auth: auth, Catalogue: catalogue, UserAuth: userAuth,
+		Protected: protected, Profile: profile, Order: order,
+	}
 }

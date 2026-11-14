@@ -27,6 +27,8 @@ type Handlers struct {
 	Store        handlerinterface.StoreHandler
 	StoreRequest handlerinterface.StoreRequestHandler
 	PublicStore  handlerinterface.PublicStoreHandler
+	Catalogue    handlerinterface.CatalogueHandler
+	UserAuth     middlewareinterface.UserAuth
 	Order        handlerinterface.OrderHandler
 	Profile      handlerinterface.ProfileHandler
 }
@@ -128,6 +130,8 @@ func New(
 		r.GET("/stores/:id", h.PublicStore.GetPublicStore)
 		r.HEAD("/stores/:id", h.PublicStore.GetPublicStore)
 	}
+
+	registerCatalogue(r, h)
 
 	return r, nil
 }
