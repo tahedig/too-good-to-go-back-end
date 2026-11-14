@@ -52,10 +52,16 @@ prepare_backup_dir() {
   return 0
 }
 
-# Latest finished backup (dump or dump.gpg), by name (names embed a UTC timestamp).
-latest_backup() {
-  find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'tgtg_*.dump' -o -name 'tgtg_*.dump.gpg' \) | sort | tail -n1
+# COMPLETE backups only (dump or dump.gpg that also has its .sha256 and .manifest), oldest first.
+# A dump without both sidecars is incomplete (e.g. an old crashed run) and is never restored or counted.
+list_complete_backups() {
+  local f
+  while IFS= read -r f; do
+    if [[ -f "$f.sha256" && -f "$f.manifest" ]]; then printf '%s\n' "$f"; fi
+  done < <(find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'tgtg_*.dump' -o -name 'tgtg_*.dump.gpg' \) | sort)
+  return 0   # never let the last (possibly skipped) item turn into a failure under set -e
 }
+latest_backup() { list_complete_backups | tail -n1; }
 
 # psql against the source (backup role) and the restore target (restore role).
 psql_src() { psql -X -qAt -v ON_ERROR_STOP=1 "$@"; }
@@ -63,3 +69,5 @@ psql_dst() {
   PGHOST="$RESTORE_PGHOST" PGPORT="$RESTORE_PGPORT" PGUSER="${RESTORE_PGUSER:?RESTORE_PGUSER is required for restore}" \
     psql -X -qAt -v ON_ERROR_STOP=1 "$@"
 }
+
+(( BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 3) )) || { echo "bash >= 4.3 required (namerefs)" >&2; exit 1; }

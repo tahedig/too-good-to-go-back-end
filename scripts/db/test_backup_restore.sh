@@ -48,6 +48,7 @@ PROTECTED_DBS="tgtg_staging tgtg_production"
 CFGEOF
 chmod 600 "$CFG"; export DB_BACKUP_ENV="$CFG"
 pass() { echo "PASS: $*"; }; fail() { echo "FAIL: $*"; exit 1; }
+ok() { [[ "$1" == "$2" ]] && pass "$3" || fail "$3 (expected '$2' got '$1')"; }
 
 echo "== 1. backup"
 bash "$HERE/backup.sh"
@@ -83,6 +84,27 @@ for e in .sha256 .manifest; do touch "$T/backups/tgtg_tgtg_staging_20200101T0000
 bash "$HERE/backup.sh" >/dev/null 2>&1
 [[ ! -e "$T/backups/tgtg_tgtg_staging_20200101T000000Z.dump" ]] && pass "old backup pruned" || fail "retention"
 [[ "$(ls "$T"/backups/tgtg_*.dump | wc -l)" -ge 2 ]] && pass "minimum kept" || fail "min keep"
+
+echo "== 7a. crash safety: no dump may become visible without its checksum and manifest"
+visible() { ls "$T"/backups/tgtg_*.dump 2>/dev/null | wc -l; }
+N="$(visible)"; sleep 1
+BACKUP_TEST_CRASH_BEFORE_COMMIT=1 bash "$HERE/backup.sh" >/dev/null 2>&1 && fail "crash hook did not fire" || [[ $? == 99 ]] && pass "simulated crash right before the commit point"
+ok "$(visible)" "$N" "crashed run published NO visible backup"
+[[ "$(ls "$T"/backups/tgtg_*.dump.sha256 | wc -l)" -gt "$N" ]] && pass "orphan sidecars exist, but are invisible to discovery" || fail "expected orphan sidecars"
+out="$(bash "$HERE/restore.sh" --target tgtg_restore_crash1 2>&1)" && pass "restore still works after the crash (uses the previous complete backup)" || { echo "$out"; fail "restore after crash"; }
+cp "$(ls "$T"/backups/tgtg_*.dump | tail -n1)" "$T/backups/tgtg_tgtg_staging_29990101T000000Z.dump"   # a dump with NO sidecars, newest by name
+out="$(bash "$HERE/restore.sh" --target tgtg_restore_crash2 2>&1)" && [[ "$out" != *29990101* ]] && pass "incomplete newest dump is ignored by 'latest'" || { echo "$out"; fail "latest picked an incomplete dump"; }
+bash "$HERE/restore.sh" --backup "$T/backups/tgtg_tgtg_staging_29990101T000000Z.dump" --target tgtg_restore_crash3 2>/dev/null && fail "restored an incomplete backup" || pass "explicit incomplete backup is refused"
+sleep 1; bash "$HERE/backup.sh" >"$T/b.log" 2>&1
+grep -q "removed orphan" "$T/b.log" && pass "next backup removes orphan sidecars" || fail "orphans not cleaned"
+grep -q "WARNING: incomplete backup ignored" "$T/b.log" && pass "next backup warns about the incomplete dump" || fail "no warning"
+rm -f "$T/backups/tgtg_tgtg_staging_29990101T000000Z.dump"
+
+echo "== 7b. a database session that dies must abort the backup, never produce a partial manifest"
+N="$(visible)"; sleep 1
+BACKUP_TEST_KILL_SESSION=1 bash "$HERE/backup.sh" >/dev/null 2>&1 && fail "backup survived a dead session" || pass "backup aborts when the session dies"
+ok "$(visible)" "$N" "no backup published after the dead session"
+ok "$(ls "$T"/backups/.*.partial 2>/dev/null | wc -l)" 0 "no partial files left behind"
 
 echo "== 7. loose config permissions rejected"
 chmod 644 "$CFG"; bash "$HERE/backup.sh" 2>/dev/null && fail "loose config accepted" || pass "world-readable config rejected"

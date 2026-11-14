@@ -31,6 +31,9 @@ TARGET="${TARGET:-tgtg_restore_$(date -u +%Y%m%d_%H%M%S)}"
 [[ "$TARGET" != "$PGDATABASE" ]] || die "refusing: target equals the active database"
 for p in $PROTECTED_DBS; do [[ "$TARGET" != "$p" ]] || die "refusing: $TARGET is a protected database"; done
 
+# --- an explicit --backup must be a COMPLETE backup (dump + checksum + manifest) --------------------------
+[[ -f "$BACKUP.sha256" && -f "$BACKUP.manifest" ]] || die "incomplete backup (missing .sha256 or .manifest): $BACKUP"
+
 # --- integrity of the file itself ---------------------------------------------------------------------
 ( cd "$(dirname "$BACKUP")" && sha256sum --check --status "$(basename "$BACKUP").sha256" ) || die "checksum mismatch for $BACKUP"
 MANIFEST="$BACKUP.manifest"; [[ -f "$MANIFEST" ]] || die "manifest missing: $MANIFEST"

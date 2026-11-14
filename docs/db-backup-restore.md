@@ -28,6 +28,14 @@ sudo systemctl enable --now tgtg-db-backup.timer tgtg-db-restore-verify.timer
 ```
 Adjust `ExecStart` paths in the units to where the scripts are deployed. For off-host copies, sync `BACKUP_DIR` to a private bucket/server with write-only credentials (not included here).
 
+## Crash safety (commit protocol)
+A backup exists only when its dump has its final name. `backup.sh` therefore writes the checksum and manifest
+first (hidden `.partial` files, fsync, then renamed into place) and renames the **dump last** as the single atomic
+commit point. Restore and retention only look at `*.dump` / `*.dump.gpg` that also have both sidecars
+(`list_complete_backups`), so a crash can leave orphan sidecars (removed by the next run) but never a visible dump
+without its checksum and manifest. A database session that dies mid-run aborts the backup (all session reads happen
+in the main shell, not in `<(...)`), so a partial table list can never become a manifest. Requires bash >= 4.3.
+
 ## Manual use
 
 ```bash
