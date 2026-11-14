@@ -16,4 +16,8 @@ const (
 	HealthPath = "/health"
 
 	SMSProviderFake = "fake"
+
+	// DevFrontendOrigin is the Vite dev server, allowed by CORS in
+	// development when CORS_ALLOWED_ORIGINS is unset.
+	DevFrontendOrigin = "http://localhost:5173"
 )

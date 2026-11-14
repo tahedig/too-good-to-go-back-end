@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -75,6 +76,11 @@ type Config struct {
 	// TrustedProxies is the list of proxy IPs/CIDRs allowed to set
 	// X-Forwarded-For. Empty means no proxy is trusted.
 	TrustedProxies []string
+
+	// CORSAllowedOrigins are the browser origins (scheme://host[:port]) that
+	// may call the API, e.g. the admin panel. Empty means no cross-origin
+	// access. In development it defaults to the Vite dev server.
+	CORSAllowedOrigins []string
 }
 
 // Addr returns the host:port the HTTP server listens on.
@@ -121,6 +127,10 @@ func LoadConfig() (*Config, error) {
 		AdminPhones:         p.phones("ADMIN_PHONES"),
 		VendorPhones:        p.phones("VENDOR_PHONES"),
 		TrustedProxies:      p.list("TRUSTED_PROXIES"),
+		CORSAllowedOrigins:  p.origins("CORS_ALLOWED_ORIGINS"),
+	}
+	if cfg.CORSAllowedOrigins == nil && cfg.AppEnv == EnvDevelopment {
+		cfg.CORSAllowedOrigins = []string{DevFrontendOrigin}
 	}
 	p.jwtSecret(cfg)
 	if cfg.RedisURL == "" && cfg.AppEnv != EnvDevelopment {
@@ -253,6 +263,22 @@ func (p *envParser) duration(key string, def time.Duration) time.Duration {
 		return def
 	}
 	return d
+}
+
+// origins parses a comma-separated list of exact origins. "*" is refused:
+// the API takes bearer tokens, so origins must be listed explicitly.
+func (p *envParser) origins(key string) []string {
+	var out []string
+	for _, raw := range p.list(key) {
+		u, err := url.Parse(raw)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" ||
+			(u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
+			p.errs = append(p.errs, fmt.Errorf("%s: %q is not an origin like https://admin.example.com", key, raw))
+			continue
+		}
+		out = append(out, u.Scheme+"://"+u.Host)
+	}
+	return out
 }
 
 func (p *envParser) list(key string) []string {
