@@ -222,3 +222,34 @@ func TestDatabaseURLRules(t *testing.T) {
 		t.Fatalf("production with DATABASE_URL should load: %v", err)
 	}
 }
+
+func TestCORSOriginRules(t *testing.T) {
+	t.Chdir(t.TempDir()) // no .env
+	for _, k := range []string{"APP_ENV", "CORS_ALLOWED_ORIGINS"} {
+		t.Setenv(k, "")
+	}
+	t.Setenv("JWT_SECRET", strings.Repeat("s", 32))
+	t.Setenv("REDIS_URL", "redis://localhost:6379/0")
+	t.Setenv("DATABASE_URL", "postgres://app:app@localhost:5432/tgtg")
+
+	cfg, err := LoadConfig()
+	if err != nil || len(cfg.CORSAllowedOrigins) != 1 || cfg.CORSAllowedOrigins[0] != DevFrontendOrigin {
+		t.Fatalf("development defaults to the Vite origin: %v %v", cfg.CORSAllowedOrigins, err)
+	}
+	t.Setenv("APP_ENV", "production")
+	if cfg, err := LoadConfig(); err != nil || len(cfg.CORSAllowedOrigins) != 0 {
+		t.Fatalf("production allows no origin by default: %v %v", cfg.CORSAllowedOrigins, err)
+	}
+
+	t.Setenv("CORS_ALLOWED_ORIGINS", "https://admin.example.com/, http://localhost:5173")
+	cfg, err = LoadConfig()
+	if err != nil || strings.Join(cfg.CORSAllowedOrigins, " ") != "https://admin.example.com http://localhost:5173" {
+		t.Fatalf("explicit origins: %v %v", cfg.CORSAllowedOrigins, err)
+	}
+	for _, bad := range []string{"*", "admin.example.com", "ftp://x.example", "https://x.example/path", "https://u:p@x.example"} {
+		t.Setenv("CORS_ALLOWED_ORIGINS", bad)
+		if _, err := LoadConfig(); err == nil || !strings.Contains(err.Error(), "CORS_ALLOWED_ORIGINS") {
+			t.Errorf("%q must be refused, got %v", bad, err)
+		}
+	}
+}

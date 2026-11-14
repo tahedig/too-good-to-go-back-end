@@ -207,6 +207,7 @@ var ErrSchemaMissing = errors.New("database schema is missing or outdated: apply
 var requiredTables = []string{
 	"users", "roles", "user_roles",
 	"stores", "offers", "orders", "order_items", "payments",
+	"store_status_history",
 }
 
 // VerifySchema checks that the tables and seeded roles the repositories rely

@@ -29,6 +29,8 @@ type Handlers struct {
 	PublicStore  handlerinterface.PublicStoreHandler
 	Order        handlerinterface.OrderHandler
 	Profile      handlerinterface.ProfileHandler
+	// VendorApproval serves the admin panel's store review (/admin/vendors).
+	VendorApproval handlerinterface.VendorApprovalHandler
 }
 
 func New(
@@ -58,6 +60,10 @@ func New(
 		errHandler.Handle(),
 		middleware.SecurityHeaders(),
 	)
+	// Before routing, so preflights for any path are answered here.
+	if len(cfg.CORSAllowedOrigins) > 0 {
+		r.Use(middleware.CORS(cfg.CORSAllowedOrigins))
+	}
 	// Zero values (e.g. a bare Config in tests) disable the limits; LoadConfig
 	// always fills safe defaults.
 	if cfg.HTTPMaxBodyBytes > 0 {
@@ -79,7 +85,7 @@ func New(
 	auth.POST("/request", h.Auth.RequestOTP)
 	auth.POST("/verify", h.Auth.VerifyOTP)
 
-	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil || h.Profile != nil || h.Order != nil) {
+	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil || h.Profile != nil || h.Order != nil || h.VendorApproval != nil) {
 		// Refuse to start rather than serve private routes unauthenticated.
 		return nil, errors.New("router: auth middleware is required for protected routes")
 	}
@@ -122,6 +128,17 @@ func New(
 	// also buy, and the query is always scoped to the caller.
 	if h.Order != nil {
 		r.GET("/orders", authMW.Authenticate(), h.Order.ListMyOrders)
+	}
+
+	// Admin only: every /admin route needs a valid token with the admin role.
+	if h.VendorApproval != nil {
+		admin := r.Group("/admin", authMW.Authenticate(), authMW.RequireRoles(enum.RoleAdmin))
+		admin.GET("/vendors", h.VendorApproval.ListVendors)
+		admin.GET("/vendors/:id", h.VendorApproval.GetVendor)
+		admin.POST("/vendors/:id/approve", h.VendorApproval.Approve)
+		admin.POST("/vendors/:id/reject", h.VendorApproval.Reject)
+		admin.POST("/vendors/:id/suspend", h.VendorApproval.Suspend)
+		admin.POST("/vendors/:id/reactivate", h.VendorApproval.Reactivate)
 	}
 
 	if h.PublicStore != nil {
