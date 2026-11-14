@@ -1,5 +1,153 @@
 basePath: /
 definitions:
+  dto.CatalogueFiltersResponse:
+    properties:
+      allergens:
+        items:
+          $ref: '#/definitions/dto.FilterOption'
+        type: array
+      categories:
+        items:
+          $ref: '#/definitions/dto.HomeCategoryResponse'
+        type: array
+      kinds:
+        items:
+          $ref: '#/definitions/dto.FilterOption'
+        type: array
+      offer_count:
+        example: 22
+        type: integer
+      price:
+        $ref: '#/definitions/dto.FilterPriceRange'
+      sort_options:
+        items:
+          $ref: '#/definitions/dto.FilterOption'
+        type: array
+    type: object
+  dto.CatalogueMapOffer:
+    properties:
+      category_slug:
+        type: string
+      currency:
+        type: string
+      discount_percent:
+        type: integer
+      distance_m:
+        type: integer
+      distance_text:
+        type: string
+      id:
+        type: string
+      image_url:
+        type: string
+      is_favorite:
+        type: boolean
+      location:
+        $ref: '#/definitions/dto.StoreLocationResponse'
+      original_price:
+        type: integer
+      pickup_window:
+        type: string
+      price:
+        type: integer
+      quantity_available:
+        type: integer
+      store:
+        $ref: '#/definitions/dto.CatalogueStoreRef'
+      title:
+        type: string
+    type: object
+  dto.CatalogueMapResponse:
+    properties:
+      center:
+        $ref: '#/definitions/dto.StoreLocationResponse'
+      items:
+        description: group by store.id on the client for one pin per store
+        items:
+          $ref: '#/definitions/dto.CatalogueMapOffer'
+        type: array
+      radius_km:
+        example: 5
+        type: number
+    type: object
+  dto.CatalogueOfferCard:
+    properties:
+      availability_badge:
+        example: ۳ بسته موجود
+        type: string
+      category_name:
+        example: نانوایی
+        type: string
+      category_slug:
+        example: bakery
+        type: string
+      currency:
+        example: تومان
+        type: string
+      discount_percent:
+        example: 60
+        type: integer
+      distance_m:
+        example: 600
+        type: integer
+      distance_text:
+        example: ۰.۶ کیلومتر
+        type: string
+      id:
+        example: 7d0c2a3e-1f5b-4a52-8c64-2f4e9b1a0c33
+        type: string
+      image_url:
+        type: string
+      is_favorite:
+        example: false
+        type: boolean
+      original_price:
+        example: 100000
+        type: integer
+      pickup_end:
+        type: string
+      pickup_start:
+        type: string
+      pickup_window:
+        example: امروز، ۱۸:۰۰-۱۹:۰۰
+        type: string
+      price:
+        example: 40000
+        type: integer
+      quantity_available:
+        example: 3
+        type: integer
+      store:
+        $ref: '#/definitions/dto.CatalogueStoreRef'
+      title:
+        example: بسته سورپرایز
+        type: string
+    type: object
+  dto.CatalogueOfferList:
+    properties:
+      has_more:
+        example: true
+        type: boolean
+      items:
+        items:
+          $ref: '#/definitions/dto.CatalogueOfferCard'
+        type: array
+      next_cursor:
+        example: eyJzIjoibmVhcmVzdCIsImsxIjo2MDB9
+        type: string
+    type: object
+  dto.CatalogueStoreRef:
+    properties:
+      id:
+        example: 3f2b8f0e-6c1d-4c53-9a43-0d1d5c7a9e11
+        type: string
+      logo_url:
+        example: https://example.com/logo.png
+        type: string
+      name:
+        example: نانوایی صبحگاهی
+        type: string
+    type: object
   dto.CreateStoreRequestInput:
     properties:
       address:
@@ -30,6 +178,32 @@ definitions:
       error:
         $ref: '#/definitions/dto.ErrorBody'
     type: object
+  dto.FavoriteOfferResponse:
+    properties:
+      is_favorite:
+        example: true
+        type: boolean
+      offer_id:
+        type: string
+    type: object
+  dto.FilterOption:
+    properties:
+      label:
+        example: ارزان‌ترین
+        type: string
+      value:
+        example: price_asc
+        type: string
+    type: object
+  dto.FilterPriceRange:
+    properties:
+      max:
+        example: 70000
+        type: integer
+      min:
+        example: 40000
+        type: integer
+    type: object
   dto.HealthCheckResult:
     properties:
       latency_ms:
@@ -48,6 +222,28 @@ definitions:
       timestamp:
         type: string
       version:
+        type: string
+    type: object
+  dto.HomeCategoriesResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/dto.HomeCategoryResponse'
+        type: array
+    type: object
+  dto.HomeCategoryResponse:
+    properties:
+      id:
+        example: 1
+        type: integer
+      kind:
+        example: bakery
+        type: string
+      name:
+        example: نانوایی
+        type: string
+      slug:
+        example: bakery
         type: string
     type: object
   dto.PublicOfferResponse:
@@ -454,6 +650,118 @@ paths:
       summary: Verify a one-time password
       tags:
       - auth
+  /favorites/offers:
+    get:
+      description: لیست علاقه‌مندی‌ها، جدیدترین اول. فقط آفرهایی که همین الان قابل
+        خرید هستند نمایش داده می‌شوند.
+      parameters:
+      - description: User latitude (fills distance)
+        in: query
+        name: lat
+        type: number
+      - description: User longitude
+        in: query
+        name: lng
+        type: number
+      - default: 20
+        description: Page size
+        in: query
+        maximum: 50
+        minimum: 1
+        name: limit
+        type: integer
+      - description: next_cursor of the previous page
+        in: query
+        name: cursor
+        type: string
+      - description: 'DEV auth: users.id'
+        in: header
+        name: X-Dev-User-Id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CatalogueOfferList'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: My favorite offers
+      tags:
+      - favorites
+  /favorites/offers/{id}:
+    delete:
+      description: حذف از علاقه‌مندی. idempotent است و همیشه ۲۰۴ برمی‌گرداند (وجود
+        یا عدم وجود آفر لو نمی‌رود).
+      parameters:
+      - description: Offer public id (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 'DEV auth: users.id'
+        in: header
+        name: X-Dev-User-Id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Remove offer from favorites
+      tags:
+      - favorites
+    put:
+      description: 'افزودن به علاقه‌مندی. idempotent است: تکرار درخواست خطا نمی‌دهد.
+        {id} همان public id آفر است. آفر ناشناس یا غیرقابل‌نمایش ۴۰۴ می‌دهد.'
+      parameters:
+      - description: Offer public id (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 'DEV auth: users.id'
+        in: header
+        name: X-Dev-User-Id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FavoriteOfferResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Add offer to favorites
+      tags:
+      - favorites
   /health:
     get:
       description: 200 when the service and all its dependencies are healthy, 503
@@ -472,6 +780,367 @@ paths:
       summary: Service health
       tags:
       - system
+  /home/categories:
+    get:
+      description: دسته‌بندی‌های صفحه اصلی.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.HomeCategoriesResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Home category shortcuts
+      tags:
+      - home
+  /home/last-chance:
+    get:
+      description: 'آخرین فرصت‌های نجات غذا: حداکثر ۳ عدد باقی‌مانده یا پایان بازه
+        تحویل تا ۲ ساعت دیگر؛ زودترین پایان اول.'
+      parameters:
+      - description: User latitude (fills distance)
+        in: query
+        name: lat
+        type: number
+      - description: User longitude
+        in: query
+        name: lng
+        type: number
+      - default: 10
+        description: Items per call
+        in: query
+        maximum: 30
+        minimum: 1
+        name: limit
+        type: integer
+      - description: next_cursor of the previous call
+        in: query
+        name: cursor
+        type: string
+      - description: 'DEV auth: users.id (fills is_favorite)'
+        in: header
+        name: X-Dev-User-Id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CatalogueOfferList'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Last chance to save food
+      tags:
+      - home
+  /home/popular-nearby:
+    get:
+      description: 'محبوب‌های اطراف شما: داخل شعاع، بیشترین علاقه‌مندی اول، سپس نزدیک‌ترین.
+        بدون lat/lng لیست خالی برمی‌گردد (نه خطا).'
+      parameters:
+      - description: User latitude
+        in: query
+        name: lat
+        type: number
+      - description: User longitude
+        in: query
+        name: lng
+        type: number
+      - default: 8
+        description: Radius in km
+        in: query
+        maximum: 100
+        minimum: 0
+        name: radius_km
+        type: number
+      - default: 10
+        description: Items per call
+        in: query
+        maximum: 30
+        minimum: 1
+        name: limit
+        type: integer
+      - description: next_cursor of the previous call
+        in: query
+        name: cursor
+        type: string
+      - description: 'DEV auth: users.id (fills is_favorite)'
+        in: header
+        name: X-Dev-User-Id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CatalogueOfferList'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Popular near you
+      tags:
+      - home
+  /home/today:
+    get:
+      description: 'فرصت‌های خوشمزه امروز: آفرهایی که بازه تحویل‌شان امروز (به وقت
+        تهران) شروع می‌شود؛ بیشترین تخفیف اول. هر بار ۱۰ مورد؛ برای «مشاهده همه» next_cursor
+        را به عنوان cursor بفرستید.'
+      parameters:
+      - description: User latitude (fills distance)
+        in: query
+        name: lat
+        type: number
+      - description: User longitude
+        in: query
+        name: lng
+        type: number
+      - default: 10
+        description: Items per call
+        in: query
+        maximum: 30
+        minimum: 1
+        name: limit
+        type: integer
+      - description: next_cursor of the previous call
+        in: query
+        name: cursor
+        type: string
+      - description: 'DEV auth: users.id (fills is_favorite)'
+        in: header
+        name: X-Dev-User-Id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CatalogueOfferList'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Today's tasty opportunities
+      tags:
+      - home
+  /offers:
+    get:
+      description: 'کاتالوگ آفرها با جستجو، فیلتر، مرتب‌سازی و pagination (cursor).
+        فقط آفرهای قابل خرید نمایش داده می‌شوند. اگر sort ارسال نشود: با lat/lng نزدیک‌ترین،
+        وگرنه جدیدترین. با تغییر فیلتر یا sort باید cursor را از اول شروع کرد.'
+      parameters:
+      - description: Search text (offer title or store name)
+        in: query
+        name: q
+        type: string
+      - collectionFormat: csv
+        description: Category ids, e.g. 1,7 (see /home/categories)
+        in: query
+        items:
+          type: integer
+        name: category
+        type: array
+      - description: Top tab
+        enum:
+        - bakery
+        - ready_meal
+        - grocery
+        in: query
+        name: kind
+        type: string
+      - description: Min price (Toman)
+        in: query
+        minimum: 0
+        name: price_min
+        type: integer
+      - description: Max price (Toman)
+        in: query
+        minimum: 0
+        name: price_max
+        type: integer
+      - description: 'RFC3339: delivery window must end after this instant'
+        in: query
+        name: pickup_from
+        type: string
+      - description: 'RFC3339: delivery window must start before this instant'
+        in: query
+        name: pickup_to
+        type: string
+      - collectionFormat: csv
+        description: Hide offers containing ANY of these
+        in: query
+        items:
+          enum:
+          - gluten
+          - dairy
+          - egg
+          - peanut
+          - nuts
+          - soy
+          - fish
+          - shellfish
+          - sesame
+          type: string
+        name: exclude_allergens
+        type: array
+      - description: User latitude (fills distance_m)
+        in: query
+        name: lat
+        type: number
+      - description: User longitude
+        in: query
+        name: lng
+        type: number
+      - description: Only offers within this radius (needs lat & lng)
+        in: query
+        maximum: 100
+        minimum: 0
+        name: radius_km
+        type: number
+      - description: Sort order
+        enum:
+        - nearest
+        - price_asc
+        - price_desc
+        - newest
+        in: query
+        name: sort
+        type: string
+      - default: 20
+        description: Page size
+        in: query
+        maximum: 50
+        minimum: 1
+        name: limit
+        type: integer
+      - description: next_cursor of the previous page
+        in: query
+        name: cursor
+        type: string
+      - description: 'DEV auth: users.id (fills is_favorite)'
+        in: header
+        name: X-Dev-User-Id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CatalogueOfferList'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Offer catalogue
+      tags:
+      - offers
+  /offers/filters:
+    get:
+      description: 'گزینه‌های فیلتر: تب‌ها، دسته‌ها، آلرژن‌ها، بازه قیمت آفرهای فعال
+        و گزینه‌های مرتب‌سازی.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CatalogueFiltersResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Filter options
+      tags:
+      - offers
+  /offers/map:
+    get:
+      description: آفرهای اطراف برای نقشه، نزدیک‌ترین اول. lat و lng اجباری است. برای
+        یک پین به ازای هر فروشگاه، سمت کلاینت روی store.id گروه‌بندی کنید.
+      parameters:
+      - description: Map centre latitude (required)
+        in: query
+        name: lat
+        type: number
+      - description: Map centre longitude (required)
+        in: query
+        name: lng
+        type: number
+      - default: 5
+        description: Radius in km
+        in: query
+        maximum: 100
+        minimum: 0
+        name: radius_km
+        type: number
+      - collectionFormat: csv
+        description: Category ids
+        in: query
+        items:
+          type: integer
+        name: category
+        type: array
+      - description: Top tab
+        enum:
+        - bakery
+        - ready_meal
+        - grocery
+        in: query
+        name: kind
+        type: string
+      - default: 100
+        description: Max pins
+        in: query
+        maximum: 300
+        minimum: 1
+        name: limit
+        type: integer
+      - description: 'DEV auth: users.id (fills is_favorite)'
+        in: header
+        name: X-Dev-User-Id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CatalogueMapResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Offers around a point (map)
+      tags:
+      - offers
   /stores/{id}:
     get:
       description: Returns public store information, schedule, and available food
@@ -501,6 +1170,120 @@ paths:
       summary: Get public store details and available offers
       tags:
       - stores
+  /stores/{id}/offers:
+    get:
+      description: آفرهای یک فروشگاه با همان فیلترها و cursor کاتالوگ. {id} همان public
+        id فروشگاه است. فروشگاه ناشناس یا غیرفعال لیست خالی می‌دهد.
+      parameters:
+      - description: Store public id (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Search text (offer title)
+        in: query
+        name: q
+        type: string
+      - collectionFormat: csv
+        description: Category ids
+        in: query
+        items:
+          type: integer
+        name: category
+        type: array
+      - description: Top tab
+        enum:
+        - bakery
+        - ready_meal
+        - grocery
+        in: query
+        name: kind
+        type: string
+      - description: Min price (Toman)
+        in: query
+        minimum: 0
+        name: price_min
+        type: integer
+      - description: Max price (Toman)
+        in: query
+        minimum: 0
+        name: price_max
+        type: integer
+      - description: 'RFC3339: delivery window must end after this instant'
+        in: query
+        name: pickup_from
+        type: string
+      - description: 'RFC3339: delivery window must start before this instant'
+        in: query
+        name: pickup_to
+        type: string
+      - collectionFormat: csv
+        description: Hide offers containing ANY of these
+        in: query
+        items:
+          enum:
+          - gluten
+          - dairy
+          - egg
+          - peanut
+          - nuts
+          - soy
+          - fish
+          - shellfish
+          - sesame
+          type: string
+        name: exclude_allergens
+        type: array
+      - description: User latitude (fills distance_m)
+        in: query
+        name: lat
+        type: number
+      - description: User longitude
+        in: query
+        name: lng
+        type: number
+      - description: Sort order
+        enum:
+        - nearest
+        - price_asc
+        - price_desc
+        - newest
+        in: query
+        name: sort
+        type: string
+      - default: 20
+        description: Page size
+        in: query
+        maximum: 50
+        minimum: 1
+        name: limit
+        type: integer
+      - description: next_cursor of the previous page
+        in: query
+        name: cursor
+        type: string
+      - description: 'DEV auth: users.id (fills is_favorite)'
+        in: header
+        name: X-Dev-User-Id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CatalogueOfferList'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Offers of one store
+      tags:
+      - offers
   /vendor/store-requests:
     get:
       consumes:

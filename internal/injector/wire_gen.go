@@ -30,14 +30,24 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 	smsSender := provideSMSSender(cfg, log)
 	authService := provideAuthService(cfg, log, injectorStorage, smsSender)
 	authHandler := handler.NewAuthHandler(authService)
-	handlers := provideHandlers(healthHandler, authHandler)
+	pool, cleanup2, err := provideDatabase(cfg, log)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	catalogueService := provideCatalogueService(pool)
+	catalogueHandler := provideCatalogueHandler(catalogueService)
+	userAuth := provideUserAuth(cfg, catalogueService)
+	handlers := provideHandlers(healthHandler, authHandler, catalogueHandler, userAuth)
 	engine, err := router.New(cfg, log, errorHandler, rateLimiter, handlers)
 	if err != nil {
+		cleanup2()
 		cleanup()
 		return nil, nil, err
 	}
 	app := newApp(engine, healthService)
 	return app, func() {
+		cleanup2()
 		cleanup()
 	}, nil
 }

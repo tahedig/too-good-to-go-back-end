@@ -52,6 +52,10 @@ type Config struct {
 	// RedisKeyPrefix namespaces every key, so environments can share a Redis.
 	RedisKeyPrefix string
 
+	// DatabaseURL (postgres://user:pass@host:5432/db?sslmode=disable) enables the catalogue endpoints
+	// (home, offers, favorites). Empty = those endpoints are not registered.
+	DatabaseURL string
+
 	// TrustedProxies is the list of proxy IPs/CIDRs allowed to set
 	// X-Forwarded-For. Empty means no proxy is trusted.
 	TrustedProxies []string
@@ -94,6 +98,7 @@ func LoadConfig() (*Config, error) {
 		AuthRateWindow:      p.duration("AUTH_RATE_WINDOW", time.Minute),
 		RedisURL:            p.string("REDIS_URL", ""),
 		RedisKeyPrefix:      p.string("REDIS_KEY_PREFIX", "tgtg:"),
+		DatabaseURL:         p.string("DATABASE_URL", ""),
 		TrustedProxies:      p.list("TRUSTED_PROXIES"),
 	}
 	if cfg.RedisURL == "" && cfg.AppEnv != EnvDevelopment {

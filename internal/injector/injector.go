@@ -18,6 +18,7 @@ import (
 	redisrepo "github.com/tahedig/too-good-to-go/backend/internal/infrastructure/repository/redis"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/sms"
 	handlerinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/handler/interface"
+	middlewareinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/router"
 )
 
@@ -105,6 +106,8 @@ func provideAuthService(
 func provideHandlers(
 	health handlerinterface.HealthHandler,
 	auth handlerinterface.AuthHandler,
+	catalogue handlerinterface.CatalogueHandler,
+	userAuth middlewareinterface.UserAuth,
 ) router.Handlers {
-	return router.Handlers{Health: health, Auth: auth}
+	return router.Handlers{Health: health, Auth: auth, Catalogue: catalogue, UserAuth: userAuth}
 }

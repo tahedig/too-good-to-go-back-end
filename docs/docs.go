@@ -119,6 +119,168 @@ const docTemplate = `{
                 }
             }
         },
+        "/favorites/offers": {
+            "get": {
+                "description": "لیست علاقه‌مندی‌ها، جدیدترین اول. فقط آفرهایی که همین الان قابل خرید هستند نمایش داده می‌شوند.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "favorites"
+                ],
+                "summary": "My favorite offers",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "User latitude (fills distance)",
+                        "name": "lat",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "User longitude",
+                        "name": "lng",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 50,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "next_cursor of the previous page",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "DEV auth: users.id",
+                        "name": "X-Dev-User-Id",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CatalogueOfferList"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/favorites/offers/{id}": {
+            "put": {
+                "description": "افزودن به علاقه‌مندی. idempotent است: تکرار درخواست خطا نمی‌دهد. {id} همان public id آفر است. آفر ناشناس یا غیرقابل‌نمایش ۴۰۴ می‌دهد.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "favorites"
+                ],
+                "summary": "Add offer to favorites",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Offer public id (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "DEV auth: users.id",
+                        "name": "X-Dev-User-Id",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FavoriteOfferResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "حذف از علاقه‌مندی. idempotent است و همیشه ۲۰۴ برمی‌گرداند (وجود یا عدم وجود آفر لو نمی‌رود).",
+                "tags": [
+                    "favorites"
+                ],
+                "summary": "Remove offer from favorites",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Offer public id (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "DEV auth: users.id",
+                        "name": "X-Dev-User-Id",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "200 when the service and all its dependencies are healthy, 503 otherwise (including during shutdown).",
@@ -140,6 +302,520 @@ const docTemplate = `{
                         "description": "Service Unavailable",
                         "schema": {
                             "$ref": "#/definitions/dto.HealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/home/categories": {
+            "get": {
+                "description": "دسته‌بندی‌های صفحه اصلی.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "home"
+                ],
+                "summary": "Home category shortcuts",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HomeCategoriesResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/home/last-chance": {
+            "get": {
+                "description": "آخرین فرصت‌های نجات غذا: حداکثر ۳ عدد باقی‌مانده یا پایان بازه تحویل تا ۲ ساعت دیگر؛ زودترین پایان اول.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "home"
+                ],
+                "summary": "Last chance to save food",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "User latitude (fills distance)",
+                        "name": "lat",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "User longitude",
+                        "name": "lng",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 30,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Items per call",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "next_cursor of the previous call",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "DEV auth: users.id (fills is_favorite)",
+                        "name": "X-Dev-User-Id",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CatalogueOfferList"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/home/popular-nearby": {
+            "get": {
+                "description": "محبوب‌های اطراف شما: داخل شعاع، بیشترین علاقه‌مندی اول، سپس نزدیک‌ترین. بدون lat/lng لیست خالی برمی‌گردد (نه خطا).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "home"
+                ],
+                "summary": "Popular near you",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "User latitude",
+                        "name": "lat",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "User longitude",
+                        "name": "lng",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 0,
+                        "type": "number",
+                        "default": 8,
+                        "description": "Radius in km",
+                        "name": "radius_km",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 30,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Items per call",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "next_cursor of the previous call",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "DEV auth: users.id (fills is_favorite)",
+                        "name": "X-Dev-User-Id",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CatalogueOfferList"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/home/today": {
+            "get": {
+                "description": "فرصت‌های خوشمزه امروز: آفرهایی که بازه تحویل‌شان امروز (به وقت تهران) شروع می‌شود؛ بیشترین تخفیف اول. هر بار ۱۰ مورد؛ برای «مشاهده همه» next_cursor را به عنوان cursor بفرستید.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "home"
+                ],
+                "summary": "Today's tasty opportunities",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "User latitude (fills distance)",
+                        "name": "lat",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "User longitude",
+                        "name": "lng",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 30,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Items per call",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "next_cursor of the previous call",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "DEV auth: users.id (fills is_favorite)",
+                        "name": "X-Dev-User-Id",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CatalogueOfferList"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/offers": {
+            "get": {
+                "description": "کاتالوگ آفرها با جستجو، فیلتر، مرتب‌سازی و pagination (cursor). فقط آفرهای قابل خرید نمایش داده می‌شوند. اگر sort ارسال نشود: با lat/lng نزدیک‌ترین، وگرنه جدیدترین. با تغییر فیلتر یا sort باید cursor را از اول شروع کرد.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "offers"
+                ],
+                "summary": "Offer catalogue",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search text (offer title or store name)",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category ids, e.g. 1,7 (see /home/categories)",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "bakery",
+                            "ready_meal",
+                            "grocery"
+                        ],
+                        "type": "string",
+                        "description": "Top tab",
+                        "name": "kind",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "description": "Min price (Toman)",
+                        "name": "price_min",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "description": "Max price (Toman)",
+                        "name": "price_max",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "RFC3339: delivery window must end after this instant",
+                        "name": "pickup_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "RFC3339: delivery window must start before this instant",
+                        "name": "pickup_to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "enum": [
+                                "gluten",
+                                "dairy",
+                                "egg",
+                                "peanut",
+                                "nuts",
+                                "soy",
+                                "fish",
+                                "shellfish",
+                                "sesame"
+                            ],
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Hide offers containing ANY of these",
+                        "name": "exclude_allergens",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "User latitude (fills distance_m)",
+                        "name": "lat",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "User longitude",
+                        "name": "lng",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 0,
+                        "type": "number",
+                        "description": "Only offers within this radius (needs lat \u0026 lng)",
+                        "name": "radius_km",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "nearest",
+                            "price_asc",
+                            "price_desc",
+                            "newest"
+                        ],
+                        "type": "string",
+                        "description": "Sort order",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 50,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "next_cursor of the previous page",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "DEV auth: users.id (fills is_favorite)",
+                        "name": "X-Dev-User-Id",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CatalogueOfferList"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/offers/filters": {
+            "get": {
+                "description": "گزینه‌های فیلتر: تب‌ها، دسته‌ها، آلرژن‌ها، بازه قیمت آفرهای فعال و گزینه‌های مرتب‌سازی.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "offers"
+                ],
+                "summary": "Filter options",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CatalogueFiltersResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/offers/map": {
+            "get": {
+                "description": "آفرهای اطراف برای نقشه، نزدیک‌ترین اول. lat و lng اجباری است. برای یک پین به ازای هر فروشگاه، سمت کلاینت روی store.id گروه‌بندی کنید.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "offers"
+                ],
+                "summary": "Offers around a point (map)",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "Map centre latitude (required)",
+                        "name": "lat",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Map centre longitude (required)",
+                        "name": "lng",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 0,
+                        "type": "number",
+                        "default": 5,
+                        "description": "Radius in km",
+                        "name": "radius_km",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category ids",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "bakery",
+                            "ready_meal",
+                            "grocery"
+                        ],
+                        "type": "string",
+                        "description": "Top tab",
+                        "name": "kind",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 300,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 100,
+                        "description": "Max pins",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "DEV auth: users.id (fills is_favorite)",
+                        "name": "X-Dev-User-Id",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CatalogueMapResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -179,6 +855,166 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/stores/{id}/offers": {
+            "get": {
+                "description": "آفرهای یک فروشگاه با همان فیلترها و cursor کاتالوگ. {id} همان public id فروشگاه است. فروشگاه ناشناس یا غیرفعال لیست خالی می‌دهد.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "offers"
+                ],
+                "summary": "Offers of one store",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Store public id (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Search text (offer title)",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category ids",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "bakery",
+                            "ready_meal",
+                            "grocery"
+                        ],
+                        "type": "string",
+                        "description": "Top tab",
+                        "name": "kind",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "description": "Min price (Toman)",
+                        "name": "price_min",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "description": "Max price (Toman)",
+                        "name": "price_max",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "RFC3339: delivery window must end after this instant",
+                        "name": "pickup_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "RFC3339: delivery window must start before this instant",
+                        "name": "pickup_to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "enum": [
+                                "gluten",
+                                "dairy",
+                                "egg",
+                                "peanut",
+                                "nuts",
+                                "soy",
+                                "fish",
+                                "shellfish",
+                                "sesame"
+                            ],
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Hide offers containing ANY of these",
+                        "name": "exclude_allergens",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "User latitude (fills distance_m)",
+                        "name": "lat",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "User longitude",
+                        "name": "lng",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "nearest",
+                            "price_asc",
+                            "price_desc",
+                            "newest"
+                        ],
+                        "type": "string",
+                        "description": "Sort order",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 50,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "next_cursor of the previous page",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "DEV auth: users.id (fills is_favorite)",
+                        "name": "X-Dev-User-Id",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CatalogueOfferList"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -501,6 +1337,220 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "dto.CatalogueFiltersResponse": {
+            "type": "object",
+            "properties": {
+                "allergens": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FilterOption"
+                    }
+                },
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.HomeCategoryResponse"
+                    }
+                },
+                "kinds": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FilterOption"
+                    }
+                },
+                "offer_count": {
+                    "type": "integer",
+                    "example": 22
+                },
+                "price": {
+                    "$ref": "#/definitions/dto.FilterPriceRange"
+                },
+                "sort_options": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FilterOption"
+                    }
+                }
+            }
+        },
+        "dto.CatalogueMapOffer": {
+            "type": "object",
+            "properties": {
+                "category_slug": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "discount_percent": {
+                    "type": "integer"
+                },
+                "distance_m": {
+                    "type": "integer"
+                },
+                "distance_text": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "is_favorite": {
+                    "type": "boolean"
+                },
+                "location": {
+                    "$ref": "#/definitions/dto.StoreLocationResponse"
+                },
+                "original_price": {
+                    "type": "integer"
+                },
+                "pickup_window": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "quantity_available": {
+                    "type": "integer"
+                },
+                "store": {
+                    "$ref": "#/definitions/dto.CatalogueStoreRef"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.CatalogueMapResponse": {
+            "type": "object",
+            "properties": {
+                "center": {
+                    "$ref": "#/definitions/dto.StoreLocationResponse"
+                },
+                "items": {
+                    "description": "group by store.id on the client for one pin per store",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.CatalogueMapOffer"
+                    }
+                },
+                "radius_km": {
+                    "type": "number",
+                    "example": 5
+                }
+            }
+        },
+        "dto.CatalogueOfferCard": {
+            "type": "object",
+            "properties": {
+                "availability_badge": {
+                    "type": "string",
+                    "example": "۳ بسته موجود"
+                },
+                "category_name": {
+                    "type": "string",
+                    "example": "نانوایی"
+                },
+                "category_slug": {
+                    "type": "string",
+                    "example": "bakery"
+                },
+                "currency": {
+                    "type": "string",
+                    "example": "تومان"
+                },
+                "discount_percent": {
+                    "type": "integer",
+                    "example": 60
+                },
+                "distance_m": {
+                    "type": "integer",
+                    "example": 600
+                },
+                "distance_text": {
+                    "type": "string",
+                    "example": "۰.۶ کیلومتر"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "7d0c2a3e-1f5b-4a52-8c64-2f4e9b1a0c33"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "is_favorite": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "original_price": {
+                    "type": "integer",
+                    "example": 100000
+                },
+                "pickup_end": {
+                    "type": "string"
+                },
+                "pickup_start": {
+                    "type": "string"
+                },
+                "pickup_window": {
+                    "type": "string",
+                    "example": "امروز، ۱۸:۰۰-۱۹:۰۰"
+                },
+                "price": {
+                    "type": "integer",
+                    "example": 40000
+                },
+                "quantity_available": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "store": {
+                    "$ref": "#/definitions/dto.CatalogueStoreRef"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "بسته سورپرایز"
+                }
+            }
+        },
+        "dto.CatalogueOfferList": {
+            "type": "object",
+            "properties": {
+                "has_more": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.CatalogueOfferCard"
+                    }
+                },
+                "next_cursor": {
+                    "type": "string",
+                    "example": "eyJzIjoibmVhcmVzdCIsImsxIjo2MDB9"
+                }
+            }
+        },
+        "dto.CatalogueStoreRef": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "3f2b8f0e-6c1d-4c53-9a43-0d1d5c7a9e11"
+                },
+                "logo_url": {
+                    "type": "string",
+                    "example": "https://example.com/logo.png"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "نانوایی صبحگاهی"
+                }
+            }
+        },
         "dto.CreateStoreRequestInput": {
             "type": "object",
             "properties": {
@@ -545,6 +1595,44 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.FavoriteOfferResponse": {
+            "type": "object",
+            "properties": {
+                "is_favorite": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "offer_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.FilterOption": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string",
+                    "example": "ارزان‌ترین"
+                },
+                "value": {
+                    "type": "string",
+                    "example": "price_asc"
+                }
+            }
+        },
+        "dto.FilterPriceRange": {
+            "type": "object",
+            "properties": {
+                "max": {
+                    "type": "integer",
+                    "example": 70000
+                },
+                "min": {
+                    "type": "integer",
+                    "example": 40000
+                }
+            }
+        },
         "dto.HealthCheckResult": {
             "type": "object",
             "properties": {
@@ -573,6 +1661,38 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.HomeCategoriesResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.HomeCategoryResponse"
+                    }
+                }
+            }
+        },
+        "dto.HomeCategoryResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "kind": {
+                    "type": "string",
+                    "example": "bakery"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "نانوایی"
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "bakery"
                 }
             }
         },

@@ -19,11 +19,13 @@ import (
 
 // Handlers groups every HTTP handler. Add new feature handlers here.
 type Handlers struct {
-	Health handlerinterface.HealthHandler
+	Health       handlerinterface.HealthHandler
 	Auth         handlerinterface.AuthHandler
 	Store        handlerinterface.StoreHandler
 	StoreRequest handlerinterface.StoreRequestHandler
 	PublicStore  handlerinterface.PublicStoreHandler
+	Catalogue    handlerinterface.CatalogueHandler
+	UserAuth     middlewareinterface.UserAuth
 }
 
 func New(
@@ -92,6 +94,8 @@ func New(
 		r.GET("/stores/:id", h.PublicStore.GetPublicStore)
 		r.HEAD("/stores/:id", h.PublicStore.GetPublicStore)
 	}
+
+	registerCatalogue(r, h)
 
 	return r, nil
 }
