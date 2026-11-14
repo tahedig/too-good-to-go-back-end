@@ -474,6 +474,115 @@ definitions:
           $ref: '#/definitions/dto.WorkingHourDTO'
         type: array
     type: object
+  dto.VendorCountsResponse:
+    properties:
+      approved:
+        example: 30
+        type: integer
+      pending:
+        example: 3
+        type: integer
+      rejected:
+        example: 2
+        type: integer
+      suspended:
+        example: 2
+        type: integer
+    type: object
+  dto.VendorDecisionRequest:
+    properties:
+      message:
+        description: 'Message for the vendor: 20 to 500 characters after trimming.'
+        example: نشانی تحویل قابل تأیید نبود. لطفاً نشانی را اصلاح کنید.
+        type: string
+      reason_code:
+        example: unverifiable_address
+        type: string
+    type: object
+  dto.VendorDecisionResponse:
+    properties:
+      decided_at:
+        example: "2026-10-16T18:00:00Z"
+        type: string
+      decided_by:
+        example: مدیر سامانه
+        type: string
+      message:
+        example: نشانی تحویل قابل تأیید نبود. لطفاً نشانی را اصلاح کنید.
+        type: string
+      reason_code:
+        example: unverifiable_address
+        type: string
+      type:
+        description: Type is rejection or suspension.
+        example: rejection
+        type: string
+    type: object
+  dto.VendorListResponse:
+    properties:
+      counts:
+        allOf:
+        - $ref: '#/definitions/dto.VendorCountsResponse'
+        description: Counts per status over all stores, ignoring the filters.
+      items:
+        items:
+          $ref: '#/definitions/dto.VendorResponse'
+        type: array
+      page:
+        example: 1
+        type: integer
+      page_size:
+        example: 20
+        type: integer
+      total:
+        example: 37
+        type: integer
+    type: object
+  dto.VendorResponse:
+    properties:
+      address:
+        example: خیابان شریعتی، پلاک ۲۴
+        type: string
+      category:
+        example: نانوایی
+        type: string
+      decision:
+        allOf:
+        - $ref: '#/definitions/dto.VendorDecisionResponse'
+        description: Decision is the latest rejection or suspension; null otherwise.
+      description:
+        example: نان و شیرینی پایان روز
+        type: string
+      email:
+        description: 'always null: accounts have no email'
+        example: "null"
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      image_url:
+        example: https://example.com/store.jpg
+        type: string
+      owner_name:
+        example: سمیرا محمدی
+        type: string
+      phone:
+        example: "+989121111111"
+        type: string
+      status:
+        description: 'Status: pending, approved, rejected or suspended.'
+        example: pending
+        type: string
+      status_updated_at:
+        example: "2026-10-20T09:00:00Z"
+        type: string
+      store_name:
+        example: نان صبحگاهی
+        type: string
+      submitted_at:
+        example: "2026-10-19T07:10:00Z"
+        type: string
+    type: object
   dto.VerifyOTPRequest:
     properties:
       code:
@@ -532,6 +641,263 @@ info:
   title: Too Good To Go API
   version: "1.0"
 paths:
+  /admin/vendors:
+    get:
+      description: Stores newest submitted first, with filters and page-number pagination.
+        total counts the filtered stores; counts counts every store per status, ignoring
+        the filters. Approval is per store, so a "vendor" here is a store.
+      parameters:
+      - description: 'Comma-separated: pending, approved, rejected, suspended'
+        in: query
+        name: status
+        type: string
+      - description: Case-insensitive substring of store name, owner name, category
+          or address (max 100 characters)
+        in: query
+        name: search
+        type: string
+      - description: 1-based page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: 1-100 (default 20)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VendorListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: 'FORBIDDEN: not an admin'
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List stores for review (admin)
+      tags:
+      - admin
+  /admin/vendors/{id}:
+    get:
+      parameters:
+      - description: Store ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VendorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get one store for review (admin)
+      tags:
+      - admin
+  /admin/vendors/{id}/approve:
+    post:
+      description: pending -> approved. The store can then publish offers and is shown
+        to customers. No body.
+      parameters:
+      - description: Store ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VendorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: 'CONFLICT: not pending, or changed meanwhile'
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Approve a pending store (admin)
+      tags:
+      - admin
+  /admin/vendors/{id}/reactivate:
+    post:
+      description: suspended -> approved; the decision is cleared. No body.
+      parameters:
+      - description: Store ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VendorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: 'CONFLICT: not suspended, or changed meanwhile'
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Reactivate a suspended store (admin)
+      tags:
+      - admin
+  /admin/vendors/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: 'pending -> rejected (final). reason_code: unverifiable_address,
+        invalid_owner_info, invalid_contact, missing_documents, ineligible_category,
+        other. message: 20-500 characters, shown to the vendor.'
+      parameters:
+      - description: Store ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Reason
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.VendorDecisionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VendorResponse'
+        "400":
+          description: 'BAD_REQUEST: invalid reason_code or message'
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: 'CONFLICT: not pending, or changed meanwhile'
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Reject a pending store (admin)
+      tags:
+      - admin
+  /admin/vendors/{id}/suspend:
+    post:
+      consumes:
+      - application/json
+      description: 'approved -> suspended. Its offers stop being publishable and visible.
+        Existing paid orders stay valid and must be fulfilled. reason_code: customer_complaints,
+        missed_pickups, frequent_cancellations, expired_license, policy_violation,
+        unpaid_balance, vendor_request, other. message: 20-500 characters.'
+      parameters:
+      - description: Store ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Reason
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.VendorDecisionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VendorResponse'
+        "400":
+          description: 'BAD_REQUEST: invalid reason_code or message'
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: 'CONFLICT: not approved, or changed meanwhile'
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Suspend an approved store (admin)
+      tags:
+      - admin
   /auth/me:
     get:
       produces:

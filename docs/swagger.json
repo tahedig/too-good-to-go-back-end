@@ -8,6 +8,394 @@
     },
     "basePath": "/",
     "paths": {
+        "/admin/vendors": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Stores newest submitted first, with filters and page-number pagination. total counts the filtered stores; counts counts every store per status, ignoring the filters. Approval is per store, so a \"vendor\" here is a store.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List stores for review (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Comma-separated: pending, approved, rejected, suspended",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Case-insensitive substring of store name, owner name, category or address (max 100 characters)",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "1-based page (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "1-100 (default 20)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN: not an admin",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/vendors/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Get one store for review (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Store ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/vendors/{id}/approve": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "pending -\u003e approved. The store can then publish offers and is shown to customers. No body.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Approve a pending store (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Store ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT: not pending, or changed meanwhile",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/vendors/{id}/reactivate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "suspended -\u003e approved; the decision is cleared. No body.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Reactivate a suspended store (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Store ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT: not suspended, or changed meanwhile",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/vendors/{id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "pending -\u003e rejected (final). reason_code: unverifiable_address, invalid_owner_info, invalid_contact, missing_documents, ineligible_category, other. message: 20-500 characters, shown to the vendor.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Reject a pending store (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Store ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Reason",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorDecisionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: invalid reason_code or message",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT: not pending, or changed meanwhile",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/vendors/{id}/suspend": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "approved -\u003e suspended. Its offers stop being publishable and visible. Existing paid orders stay valid and must be fulfilled. reason_code: customer_complaints, missed_pickups, frequent_cancellations, expired_license, policy_violation, unpaid_balance, vendor_request, other. message: 20-500 characters.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Suspend an approved store (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Store ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Reason",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorDecisionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: invalid reason_code or message",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT: not approved, or changed meanwhile",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/me": {
             "get": {
                 "security": [
@@ -1471,6 +1859,161 @@
                     "items": {
                         "$ref": "#/definitions/dto.WorkingHourDTO"
                     }
+                }
+            }
+        },
+        "dto.VendorCountsResponse": {
+            "type": "object",
+            "properties": {
+                "approved": {
+                    "type": "integer",
+                    "example": 30
+                },
+                "pending": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "rejected": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "suspended": {
+                    "type": "integer",
+                    "example": 2
+                }
+            }
+        },
+        "dto.VendorDecisionRequest": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "description": "Message for the vendor: 20 to 500 characters after trimming.",
+                    "type": "string",
+                    "example": "نشانی تحویل قابل تأیید نبود. لطفاً نشانی را اصلاح کنید."
+                },
+                "reason_code": {
+                    "type": "string",
+                    "example": "unverifiable_address"
+                }
+            }
+        },
+        "dto.VendorDecisionResponse": {
+            "type": "object",
+            "properties": {
+                "decided_at": {
+                    "type": "string",
+                    "example": "2026-10-16T18:00:00Z"
+                },
+                "decided_by": {
+                    "type": "string",
+                    "example": "مدیر سامانه"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "نشانی تحویل قابل تأیید نبود. لطفاً نشانی را اصلاح کنید."
+                },
+                "reason_code": {
+                    "type": "string",
+                    "example": "unverifiable_address"
+                },
+                "type": {
+                    "description": "Type is rejection or suspension.",
+                    "type": "string",
+                    "example": "rejection"
+                }
+            }
+        },
+        "dto.VendorListResponse": {
+            "type": "object",
+            "properties": {
+                "counts": {
+                    "description": "Counts per status over all stores, ignoring the filters.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.VendorCountsResponse"
+                        }
+                    ]
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.VendorResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "page_size": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 37
+                }
+            }
+        },
+        "dto.VendorResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "example": "خیابان شریعتی، پلاک ۲۴"
+                },
+                "category": {
+                    "type": "string",
+                    "example": "نانوایی"
+                },
+                "decision": {
+                    "description": "Decision is the latest rejection or suspension; null otherwise.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.VendorDecisionResponse"
+                        }
+                    ]
+                },
+                "description": {
+                    "type": "string",
+                    "example": "نان و شیرینی پایان روز"
+                },
+                "email": {
+                    "description": "always null: accounts have no email",
+                    "type": "string",
+                    "example": "null"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "image_url": {
+                    "type": "string",
+                    "example": "https://example.com/store.jpg"
+                },
+                "owner_name": {
+                    "type": "string",
+                    "example": "سمیرا محمدی"
+                },
+                "phone": {
+                    "type": "string",
+                    "example": "+989121111111"
+                },
+                "status": {
+                    "description": "Status: pending, approved, rejected or suspended.",
+                    "type": "string",
+                    "example": "pending"
+                },
+                "status_updated_at": {
+                    "type": "string",
+                    "example": "2026-10-20T09:00:00Z"
+                },
+                "store_name": {
+                    "type": "string",
+                    "example": "نان صبحگاهی"
+                },
+                "submitted_at": {
+                    "type": "string",
+                    "example": "2026-10-19T07:10:00Z"
                 }
             }
         },

@@ -116,6 +116,7 @@ func provideAuthService(
 type database struct {
 	users    repository.UserRepository
 	orders   repository.OrderRepository
+	vendors  repository.VendorApprovalRepository
 	checkers []serviceinterface.HealthChecker
 }
 
@@ -128,7 +129,8 @@ const dbConnectTimeout = 5 * time.Second
 func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func(), error) {
 	if cfg.DatabaseURL == "" {
 		log.Warn("DATABASE_URL is not set: users and orders are kept in memory, are lost on restart and are not shared between instances")
-		return &database{users: memory.NewUserRepository(), orders: memory.NewOrderRepository()}, func() {}, nil
+		return &database{users: memory.NewUserRepository(), orders: memory.NewOrderRepository(),
+			vendors: memory.NewVendorApprovalRepository()}, func() {}, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbConnectTimeout)
@@ -147,6 +149,7 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 	return &database{
 		users:    postgres.NewUserRepository(pool),
 		orders:   postgres.NewOrderRepository(pool),
+		vendors:  postgres.NewVendorApprovalRepository(pool),
 		checkers: []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
 	}, pool.Close, nil
 }
@@ -154,6 +157,10 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 func provideUserRepository(db *database) repository.UserRepository { return db.users }
 
 func provideOrderRepository(db *database) repository.OrderRepository { return db.orders }
+
+func provideVendorApprovalRepository(db *database) repository.VendorApprovalRepository {
+	return db.vendors
+}
 
 // providePhoneRoles maps ADMIN_PHONES / VENDOR_PHONES to the role a new user
 // with that phone receives. Admin wins if a phone is in both lists.
@@ -187,6 +194,8 @@ func provideHandlers(
 	protected handlerinterface.ProtectedHandler,
 	profile handlerinterface.ProfileHandler,
 	order handlerinterface.OrderHandler,
+	vendorApproval handlerinterface.VendorApprovalHandler,
 ) router.Handlers {
-	return router.Handlers{Health: health, Auth: auth, Protected: protected, Profile: profile, Order: order}
+	return router.Handlers{Health: health, Auth: auth, Protected: protected, Profile: profile, Order: order,
+		VendorApproval: vendorApproval}
 }

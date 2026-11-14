@@ -305,6 +305,46 @@ curl -H "Authorization: Bearer $TOKEN" "http://localhost:8080/orders?group=upcom
 Without `DATABASE_URL` orders are kept in memory and the list starts empty:
 nothing creates orders yet.
 
+## Vendor approval (admin)
+
+Admins review stores under `/admin/vendors` (admin role only: `401` without a
+valid token, `403` for any other role). Approval is per store, so a "vendor"
+here is a store; `stores.status` is the only status there is.
+
+| Action | From | To | Body |
+|---|---|---|---|
+| `POST /admin/vendors/{id}/approve` | `pending` | `approved` | none |
+| `POST /admin/vendors/{id}/reject` | `pending` | `rejected` (final) | `reason_code`, `message` |
+| `POST /admin/vendors/{id}/suspend` | `approved` | `suspended` | `reason_code`, `message` |
+| `POST /admin/vendors/{id}/reactivate` | `suspended` | `approved` | none |
+
+- `GET /admin/vendors?status=pending,approved&search=نان&page=1&page_size=20`
+  lists stores newest first. `total` counts the filtered stores; `counts`
+  counts every store per status (ignoring filters) for the summary cards.
+  `GET /admin/vendors/{id}` returns one store.
+- `message` must be 20-500 characters after trimming. Reject reasons:
+  `unverifiable_address`, `invalid_owner_info`, `invalid_contact`,
+  `missing_documents`, `ineligible_category`, `other`. Suspend reasons:
+  `customer_complaints`, `missed_pickups`, `frequent_cancellations`,
+  `expired_license`, `policy_violation`, `unpaid_balance`, `vendor_request`,
+  `other`.
+- Checks run in this order: `401`, `403`, `404` (no such store), `400`
+  (invalid body), `409` (transition not allowed from the current status, or
+  another admin changed it first). Messages are in Persian and safe to show.
+- The status change and its `store_status_history` row are written in one
+  transaction, and the update only applies if the store is still in the
+  expected status, so concurrent decisions cannot both succeed. The admin
+  comes from the token; extra body fields such as `status` are ignored.
+- Every response is the full updated store. `decision` holds the latest
+  rejection or suspension and is `null` otherwise.
+- **One status.** Publishing an offer is refused by the database unless the
+  store is `approved`, so suspending a store stops new offers at once and
+  reactivating it restores them; nothing else has to be updated. Paid orders
+  of a suspended store stay valid and must still be fulfilled.
+
+Browsers on other origins (the admin panel) need `CORS_ALLOWED_ORIGINS`; in
+development it defaults to `http://localhost:5173`.
+
 ## Error response format
 
 Every error from every endpoint (including 404, 405 and recovered panics) has

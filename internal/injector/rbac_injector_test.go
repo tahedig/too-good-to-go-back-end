@@ -28,7 +28,8 @@ func TestInitializeAppProtectsRoutes(t *testing.T) {
 	}
 	defer cleanup()
 
-	for path, want := range map[string]int{"/health": http.StatusOK, "/auth/me": http.StatusUnauthorized, "/test/admin": http.StatusUnauthorized, "/orders": http.StatusUnauthorized} {
+	for path, want := range map[string]int{"/health": http.StatusOK, "/auth/me": http.StatusUnauthorized, "/test/admin": http.StatusUnauthorized, "/orders": http.StatusUnauthorized,
+		"/admin/vendors": http.StatusUnauthorized} {
 		w := httptest.NewRecorder()
 		app.Router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
 		if w.Code != want {
