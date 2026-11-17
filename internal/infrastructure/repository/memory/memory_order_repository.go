@@ -21,6 +21,7 @@ type OrderRepository struct {
 	byUser       map[string][]model.Order
 	vendorStores map[string]model.VendorStoreActive
 	vendorOrders map[string][]model.VendorOrder
+	offerStock   map[string]int
 }
 
 func NewOrderRepository() *OrderRepository {
@@ -28,10 +29,25 @@ func NewOrderRepository() *OrderRepository {
 		byUser:       make(map[string][]model.Order),
 		vendorStores: make(map[string]model.VendorStoreActive),
 		vendorOrders: make(map[string][]model.VendorOrder),
+		offerStock:   make(map[string]int),
 	}
 }
 
 var _ repository.OrderRepository = (*OrderRepository)(nil)
+
+// SetOfferStock sets available stock for an offer in memory (for testing inventory consistency).
+func (r *OrderRepository) SetOfferStock(offerID string, qty int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.offerStock[offerID] = qty
+}
+
+// GetOfferStock returns available stock for an offer in memory.
+func (r *OrderRepository) GetOfferStock(offerID string) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.offerStock[offerID]
+}
 
 // AddVendorStore sets an active store for the vendor user.
 func (r *OrderRepository) AddVendorStore(vendorUserID string, s model.VendorStoreActive) {
@@ -197,10 +213,11 @@ func (r *OrderRepository) VerifyPickup(_ context.Context, vendorUserID string, o
 	}
 
 	order := &orders[foundIndex]
-	if order.Status == enum.VendorOrderStatusDelivered {
+	dbStatus := effectiveDBStatus(order)
+	if dbStatus == enum.OrderStatusCompleted {
 		return nil, exception.ErrOrderAlreadyDelivered
 	}
-	if order.Status == enum.VendorOrderStatusCancelled {
+	if !enum.CanVendorTransition(dbStatus, enum.OrderStatusCompleted) {
 		return nil, exception.ErrOrderCannotBeDelivered
 	}
 	if pickupCode != "" && order.PickupCode != "" && pickupCode != order.PickupCode {
@@ -208,6 +225,7 @@ func (r *OrderRepository) VerifyPickup(_ context.Context, vendorUserID string, o
 	}
 
 	now := time.Now().UTC()
+	order.DBStatus = enum.OrderStatusCompleted
 	order.Status = enum.VendorOrderStatusDelivered
 	order.DeliveredAt = &now
 
@@ -218,5 +236,59 @@ func (r *OrderRepository) VerifyPickup(_ context.Context, vendorUserID string, o
 		DeliveredAt: now,
 		Message:     "تحویل بسته با موفقیت ثبت شد",
 	}, nil
+}
+
+func (r *OrderRepository) UpdateVendorOrderStatus(_ context.Context, vendorUserID string, orderID string, targetStatus enum.OrderStatus, _ string) (*model.VendorOrderStatusUpdateResult, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	orders := r.vendorOrders[vendorUserID]
+	foundIndex := -1
+	for i, o := range orders {
+		if o.ID == orderID || strings.EqualFold(o.ID, orderID) {
+			foundIndex = i
+			break
+		}
+	}
+	if foundIndex == -1 {
+		return nil, exception.ErrOrderNotFound
+	}
+
+	order := &orders[foundIndex]
+	currentDBStatus := effectiveDBStatus(order)
+	if !enum.CanVendorTransition(currentDBStatus, targetStatus) {
+		return nil, exception.ErrInvalidOrderTransition
+	}
+
+	now := time.Now().UTC()
+	order.DBStatus = targetStatus
+	order.Status = targetStatus.ToVendorStatus()
+
+	if targetStatus == enum.OrderStatusCancelled && order.Package.ID != "" {
+		r.offerStock[order.Package.ID] += order.Quantity
+	}
+
+	return &model.VendorOrderStatusUpdateResult{
+		Success:   true,
+		OrderID:   order.ID,
+		Status:    order.Status,
+		UpdatedAt: now,
+		Message:   "وضعیت سفارش با موفقیت به‌روزرسانی شد",
+	}, nil
+}
+
+func effectiveDBStatus(o *model.VendorOrder) enum.OrderStatus {
+	if o.DBStatus != "" {
+		return o.DBStatus
+	}
+	switch o.Status {
+	case enum.VendorOrderStatusReadyForPickup:
+		return enum.OrderStatusReady
+	case enum.VendorOrderStatusDelivered:
+		return enum.OrderStatusCompleted
+	case enum.VendorOrderStatusCancelled:
+		return enum.OrderStatusCancelled
+	default:
+		return enum.OrderStatusPaid
+	}
 }
 

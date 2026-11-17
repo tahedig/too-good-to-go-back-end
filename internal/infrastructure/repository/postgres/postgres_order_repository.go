@@ -516,7 +516,7 @@ FOR UPDATE OF o`
 	if dbStatus == enum.OrderStatusCompleted {
 		return nil, exception.ErrOrderAlreadyDelivered
 	}
-	if dbStatus == enum.OrderStatusCancelled || dbStatus == enum.OrderStatusExpired || dbStatus == enum.OrderStatusNoShow {
+	if !enum.CanVendorTransition(dbStatus, enum.OrderStatusCompleted) {
 		return nil, exception.ErrOrderCannotBeDelivered
 	}
 
@@ -526,6 +526,10 @@ FOR UPDATE OF o`
 
 	now := time.Now().UTC()
 
+	if _, err = tx.Exec(ctx, `SELECT set_config('app.user_id', $1::text, true)`, vendorNumID); err != nil {
+		return nil, fmt.Errorf("set actor user_id: %w", err)
+	}
+
 	const updateQuery = `
 UPDATE orders
 SET status = 'completed', confirmed_by = $1, completed_at = $2, updated_at = $2
@@ -534,15 +538,6 @@ WHERE id = $3`
 	_, err = tx.Exec(ctx, updateQuery, vendorNumID, now, orderNumericID)
 	if err != nil {
 		return nil, fmt.Errorf("update order completed: %w", err)
-	}
-
-	const historyQuery = `
-INSERT INTO order_status_history (order_id, from_status, to_status, actor_user_id, reason, created_at)
-VALUES ($1, $2, 'completed', $3, 'pickup verified by vendor', $4)`
-
-	_, err = tx.Exec(ctx, historyQuery, orderNumericID, statusStr, vendorNumID, now)
-	if err != nil {
-		return nil, fmt.Errorf("insert order status history: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -555,6 +550,102 @@ VALUES ($1, $2, 'completed', $3, 'pickup verified by vendor', $4)`
 		Status:      enum.VendorOrderStatusDelivered,
 		DeliveredAt: now,
 		Message:     "تحویل بسته با موفقیت ثبت شد",
+	}, nil
+}
+
+func (r *orderRepository) UpdateVendorOrderStatus(ctx context.Context, vendorUserID string, orderID string, targetStatus enum.OrderStatus, reason string) (*model.VendorOrderStatusUpdateResult, error) {
+	if !security.IsID(vendorUserID) {
+		return nil, exception.ErrOrderNotFound
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin update vendor order status tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	const selectQuery = `
+SELECT o.id, o.public_id::text, o.status::text, v.id AS vendor_id
+FROM orders o
+JOIN stores s ON s.id = o.store_id
+JOIN users v ON v.id = s.vendor_id
+WHERE v.public_id = $1::uuid AND s.deleted_at IS NULL
+  AND (o.public_id::text = $2 OR o.id::text = $2)
+FOR UPDATE OF o`
+
+	var (
+		orderNumericID int64
+		orderPublicID  string
+		statusStr      string
+		vendorNumID    int64
+	)
+
+	err = tx.QueryRow(ctx, selectQuery, vendorUserID, orderID).Scan(
+		&orderNumericID, &orderPublicID, &statusStr, &vendorNumID,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, exception.ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("select order for status transition: %w", err)
+	}
+
+	dbStatus := enum.OrderStatus(statusStr)
+	if !enum.CanVendorTransition(dbStatus, targetStatus) {
+		return nil, exception.ErrInvalidOrderTransition
+	}
+
+	if _, err = tx.Exec(ctx, `SELECT set_config('app.user_id', $1::text, true)`, vendorNumID); err != nil {
+		return nil, fmt.Errorf("set actor user_id: %w", err)
+	}
+
+	now := time.Now().UTC()
+
+	if targetStatus == enum.OrderStatusCancelled {
+		const cancelQuery = `
+UPDATE orders
+SET status = 'cancelled', cancelled_by = 'vendor', cancel_reason = NULLIF($1, ''), cancelled_at = $2, updated_at = $2
+WHERE id = $3`
+		if _, err = tx.Exec(ctx, cancelQuery, reason, now, orderNumericID); err != nil {
+			return nil, fmt.Errorf("cancel vendor order: %w", err)
+		}
+
+		// Restore offer inventory atomically in the same transaction.
+		const restoreInventoryQuery = `
+UPDATE offers f
+SET quantity_available = f.quantity_available + s.q,
+    status = CASE WHEN f.status = 'sold_out' AND f.pickup_end > now()
+                  THEN 'active'::offer_status ELSE f.status END
+FROM (
+    SELECT oi.offer_id, SUM(oi.quantity)::int AS q
+    FROM order_items oi
+    WHERE oi.order_id = $1
+    GROUP BY oi.offer_id
+) s
+WHERE f.id = s.offer_id`
+		if _, err = tx.Exec(ctx, restoreInventoryQuery, orderNumericID); err != nil {
+			return nil, fmt.Errorf("restore offer inventory: %w", err)
+		}
+	} else {
+		const updateQuery = `
+UPDATE orders
+SET status = $1::order_status, updated_at = $2
+WHERE id = $3`
+		if _, err = tx.Exec(ctx, updateQuery, string(targetStatus), now, orderNumericID); err != nil {
+			return nil, fmt.Errorf("update vendor order status: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit update vendor order status tx: %w", err)
+	}
+
+	return &model.VendorOrderStatusUpdateResult{
+		Success:   true,
+		OrderID:   orderPublicID,
+		Status:    targetStatus.ToVendorStatus(),
+		UpdatedAt: now,
+		Message:   "وضعیت سفارش با موفقیت به‌روزرسانی شد",
 	}, nil
 }
 
