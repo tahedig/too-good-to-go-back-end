@@ -8,6 +8,7 @@ var (
 	ErrInvalidPickupCode      = NewBadRequest("کد تحویل نامعتبر است", nil)
 	ErrOrderAlreadyDelivered  = NewConflict("سفارش قبلاً تحویل داده شده است")
 	ErrOrderCannotBeDelivered = NewBadRequest("وضعیت سفارش اجازه تحویل را نمی‌دهد", nil)
+	ErrInvalidOrderTransition = NewConflict("تغییر وضعیت سفارش از وضعیت فعلی مجاز نیست")
 )
 
 // IsDomainOrderError checks if an error is one of the domain order errors.
@@ -16,5 +17,6 @@ func IsDomainOrderError(err error) bool {
 		errors.Is(err, ErrStoreNotFound) ||
 		errors.Is(err, ErrInvalidPickupCode) ||
 		errors.Is(err, ErrOrderAlreadyDelivered) ||
-		errors.Is(err, ErrOrderCannotBeDelivered)
+		errors.Is(err, ErrOrderCannotBeDelivered) ||
+		errors.Is(err, ErrInvalidOrderTransition)
 }

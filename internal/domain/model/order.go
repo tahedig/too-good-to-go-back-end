@@ -76,11 +76,21 @@ type VendorOrder struct {
 	UnitPrice      int64
 	TotalPrice     int64
 	Status         enum.VendorOrderStatus
+	DBStatus       enum.OrderStatus
 	PickupDate     string // "YYYY-MM-DD"
 	PickupTimeSlot VendorOrderTimeSlot
 	PickupCode     string
 	DeliveredAt    *time.Time
 	CreatedAt      time.Time
+}
+
+// VendorOrderStatusUpdateResult is the domain model output of a vendor order status transition.
+type VendorOrderStatusUpdateResult struct {
+	Success   bool
+	OrderID   string
+	Status    enum.VendorOrderStatus
+	UpdatedAt time.Time
+	Message   string
 }
 
 // VendorOrderSummary represents daily aggregated summary stats for vendor orders.

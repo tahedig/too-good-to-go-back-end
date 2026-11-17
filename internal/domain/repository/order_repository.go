@@ -52,5 +52,9 @@ type OrderRepository interface {
 
 	// VerifyPickup marks an order as delivered after verifying ownership and optional pickup code.
 	VerifyPickup(ctx context.Context, vendorUserID string, orderID string, pickupCode string) (*model.VerifyPickupResult, error)
+
+	// UpdateVendorOrderStatus transitions an order belonging to the vendor's store
+	// to targetStatus (ready, cancelled, no_show) and restores offer inventory on cancellation.
+	UpdateVendorOrderStatus(ctx context.Context, vendorUserID string, orderID string, targetStatus enum.OrderStatus, reason string) (*model.VendorOrderStatusUpdateResult, error)
 }
 

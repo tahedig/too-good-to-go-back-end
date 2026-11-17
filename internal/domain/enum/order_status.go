@@ -93,3 +93,31 @@ func VendorFilterToOrderStatuses(filter string) []OrderStatus {
 	}
 }
 
+// ParseVendorTargetStatus converts a vendor-requested target status into the DB OrderStatus
+// and corresponding VendorOrderStatus. Supports ready_for_pickup/ready, cancelled, and no_show.
+func ParseVendorTargetStatus(raw string) (OrderStatus, VendorOrderStatus, bool) {
+	switch raw {
+	case "ready_for_pickup", "ready":
+		return OrderStatusReady, VendorOrderStatusReadyForPickup, true
+	case "cancelled":
+		return OrderStatusCancelled, VendorOrderStatusCancelled, true
+	case "no_show":
+		return OrderStatusNoShow, VendorOrderStatusCancelled, true
+	default:
+		return "", "", false
+	}
+}
+
+// CanVendorTransition reports whether a vendor is allowed to transition an order
+// from `from` to `to` according to the order state machine.
+func CanVendorTransition(from, to OrderStatus) bool {
+	switch from {
+	case OrderStatusPaid:
+		return to == OrderStatusReady || to == OrderStatusCompleted || to == OrderStatusCancelled || to == OrderStatusNoShow
+	case OrderStatusReady:
+		return to == OrderStatusCompleted || to == OrderStatusCancelled || to == OrderStatusNoShow
+	default:
+		return false
+	}
+}
+
