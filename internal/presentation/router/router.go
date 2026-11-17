@@ -124,6 +124,7 @@ func New(
 		vendor.GET("/orders/summary", h.Order.GetVendorOrderSummary)
 		vendor.GET("/orders/:id", h.Order.GetVendorOrder)
 		vendor.POST("/orders/:id/verify-pickup", h.Order.VerifyPickup)
+		vendor.PATCH("/orders/:id/status", h.Order.UpdateVendorOrderStatus)
 	}
 
 	// Mirror under /api/v1/vendor for frontend api client compatibility.
@@ -137,6 +138,7 @@ func New(
 		apiV1Vendor.GET("/orders/summary", h.Order.GetVendorOrderSummary)
 		apiV1Vendor.GET("/orders/:id", h.Order.GetVendorOrder)
 		apiV1Vendor.POST("/orders/:id/verify-pickup", h.Order.VerifyPickup)
+		apiV1Vendor.PATCH("/orders/:id/status", h.Order.UpdateVendorOrderStatus)
 	}
 
 

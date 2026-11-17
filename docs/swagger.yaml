@@ -670,6 +670,40 @@ definitions:
           $ref: '#/definitions/dto.WorkingHourDTO'
         type: array
     type: object
+  dto.UpdateVendorOrderStatusRequest:
+    properties:
+      reason:
+        example: عدم مراجعه مشتری
+        type: string
+      status:
+        enum:
+        - ready_for_pickup
+        - ready
+        - cancelled
+        - no_show
+        example: ready_for_pickup
+        type: string
+    required:
+    - status
+    type: object
+  dto.UpdateVendorOrderStatusResponse:
+    properties:
+      message:
+        example: وضعیت سفارش با موفقیت به‌روزرسانی شد
+        type: string
+      order_id:
+        example: ord_12345
+        type: string
+      status:
+        example: ready_for_pickup
+        type: string
+      success:
+        example: true
+        type: boolean
+      updated_at:
+        example: "2026-10-19T18:00:00Z"
+        type: string
+    type: object
   dto.VendorCountsResponse:
     properties:
       approved:
@@ -2240,6 +2274,57 @@ paths:
       security:
       - BearerAuth: []
       summary: Get vendor order details
+      tags:
+      - vendor
+  /vendor/orders/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      description: Transitions a vendor order to ready_for_pickup (ready), cancelled
+        (restores offer inventory), or no_show. Enforces store ownership and valid
+        state transitions.
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Target status and optional reason
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateVendorOrderStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.UpdateVendorOrderStatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update vendor order status
       tags:
       - vendor
   /vendor/orders/{id}/verify-pickup:

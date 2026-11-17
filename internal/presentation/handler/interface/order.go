@@ -9,4 +9,5 @@ type OrderHandler interface {
 	GetVendorOrder(c *gin.Context)
 	GetVendorOrderSummary(c *gin.Context)
 	VerifyPickup(c *gin.Context)
+	UpdateVendorOrderStatus(c *gin.Context)
 }

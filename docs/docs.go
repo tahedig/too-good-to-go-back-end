@@ -1909,6 +1909,82 @@ const docTemplate = `{
                 }
             }
         },
+        "/vendor/orders/{id}/status": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Transitions a vendor order to ready_for_pickup (ready), cancelled (restores offer inventory), or no_show. Enforces store ownership and valid state transitions.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendor"
+                ],
+                "summary": "Update vendor order status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Target status and optional reason",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateVendorOrderStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateVendorOrderStatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/vendor/orders/{id}/verify-pickup": {
             "post": {
                 "security": [
@@ -3283,6 +3359,53 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/dto.WorkingHourDTO"
                     }
+                }
+            }
+        },
+        "dto.UpdateVendorOrderStatusRequest": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "example": "عدم مراجعه مشتری"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "ready_for_pickup",
+                        "ready",
+                        "cancelled",
+                        "no_show"
+                    ],
+                    "example": "ready_for_pickup"
+                }
+            }
+        },
+        "dto.UpdateVendorOrderStatusResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "وضعیت سفارش با موفقیت به‌روزرسانی شد"
+                },
+                "order_id": {
+                    "type": "string",
+                    "example": "ord_12345"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "ready_for_pickup"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2026-10-19T18:00:00Z"
                 }
             }
         },

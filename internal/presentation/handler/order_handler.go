@@ -339,6 +339,59 @@ func (h *orderHandler) VerifyPickup(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// UpdateVendorOrderStatus godoc
+// @Summary      Update vendor order status
+// @Description  Transitions a vendor order to ready_for_pickup (ready), cancelled (restores offer inventory), or no_show. Enforces store ownership and valid state transitions.
+// @Tags         vendor
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path string                             true "Order ID"
+// @Param        body body dto.UpdateVendorOrderStatusRequest true "Target status and optional reason"
+// @Success      200 {object} dto.UpdateVendorOrderStatusResponse
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Failure      409 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /vendor/orders/{id}/status [patch]
+func (h *orderHandler) UpdateVendorOrderStatus(c *gin.Context) {
+	vendorUserID := getContextUserID(c)
+	if vendorUserID == "" {
+		abortWithError(c, exception.NewUnauthorized("authentication required"))
+		return
+	}
+
+	orderID := c.Param("id")
+	if orderID == "" {
+		abortWithError(c, exception.NewBadRequest("order id is required", nil))
+		return
+	}
+
+	var req dto.UpdateVendorOrderStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		abortWithError(c, exception.NewBadRequest("invalid request body", nil))
+		return
+	}
+
+	res, err := h.svc.UpdateVendorOrderStatus(c.Request.Context(), vendorUserID, orderID, req.Status, req.Reason)
+	if err != nil {
+		abortWithError(c, err)
+		return
+	}
+
+	resp := dto.UpdateVendorOrderStatusResponse{
+		Success:   res.Success,
+		OrderID:   res.OrderID,
+		Status:    string(res.Status),
+		UpdatedAt: res.UpdatedAt.UTC().Format(time.RFC3339),
+		Message:   res.Message,
+	}
+
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, resp)
+}
+
 func toVendorStoreActiveResponse(s *model.VendorStoreActive) dto.VendorStoreActiveResponse {
 	return dto.VendorStoreActiveResponse{
 		ID:       s.ID,

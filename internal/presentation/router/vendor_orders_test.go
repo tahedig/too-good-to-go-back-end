@@ -32,6 +32,8 @@ func TestVendorRoutesRBAC(t *testing.T) {
 		{http.MethodGet, "/api/v1/vendor/orders/test-id"},
 		{http.MethodPost, "/vendor/orders/test-id/verify-pickup"},
 		{http.MethodPost, "/api/v1/vendor/orders/test-id/verify-pickup"},
+		{http.MethodPatch, "/vendor/orders/test-id/status"},
+		{http.MethodPatch, "/api/v1/vendor/orders/test-id/status"},
 	}
 
 	for _, rt := range routes {
@@ -253,5 +255,61 @@ func TestVendorOrdersFlow(t *testing.T) {
 	e.r.ServeHTTP(w, req)
 	if w.Code != http.StatusConflict {
 		t.Fatalf("expected 409 for already delivered, got %d %s", w.Code, w.Body.String())
+	}
+}
+
+func TestVendorOrderStatusTransitionsHTTP(t *testing.T) {
+	e := newOrdersEnv(t)
+	vendor := e.login(t, rbacVendorPhone)
+
+	e.orders.SetOfferStock("pkg_501", 2)
+	e.orders.AddVendorOrder(vendor.User.ID, model.VendorOrder{
+		ID:       "ord-trans-1",
+		Status:   enum.VendorOrderStatusActive,
+		DBStatus: enum.OrderStatusPaid,
+		Package:  model.VendorOrderPackage{ID: "pkg_501", Title: "Bread"},
+		Quantity: 3,
+	})
+
+	// 1. Transition active -> ready_for_pickup
+	readyBody, _ := json.Marshal(dto.UpdateVendorOrderStatusRequest{Status: "ready_for_pickup"})
+	req := httptest.NewRequest(http.MethodPatch, "/vendor/orders/ord-trans-1/status", bytes.NewReader(readyBody))
+	req.Header.Set("Authorization", "Bearer "+vendor.AccessToken)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	e.r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for ready_for_pickup, got %d %s", w.Code, w.Body.String())
+	}
+	var readyResp dto.UpdateVendorOrderStatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &readyResp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !readyResp.Success || readyResp.Status != "ready_for_pickup" {
+		t.Fatalf("unexpected ready response: %+v", readyResp)
+	}
+
+	// 2. Transition ready_for_pickup -> cancelled via /api/v1/vendor/... restores stock
+	cancelBody, _ := json.Marshal(dto.UpdateVendorOrderStatusRequest{Status: "cancelled", Reason: "closed early"})
+	req = httptest.NewRequest(http.MethodPatch, "/api/v1/vendor/orders/ord-trans-1/status", bytes.NewReader(cancelBody))
+	req.Header.Set("Authorization", "Bearer "+vendor.AccessToken)
+	req.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	e.r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for cancelled, got %d %s", w.Code, w.Body.String())
+	}
+	if stock := e.orders.GetOfferStock("pkg_501"); stock != 5 {
+		t.Fatalf("expected stock restored to 5, got %d", stock)
+	}
+
+	// 3. Re-transition cancelled -> ready_for_pickup fails with 409 Conflict
+	req = httptest.NewRequest(http.MethodPatch, "/vendor/orders/ord-trans-1/status", bytes.NewReader(readyBody))
+	req.Header.Set("Authorization", "Bearer "+vendor.AccessToken)
+	req.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	e.r.ServeHTTP(w, req)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409 for invalid transition, got %d %s", w.Code, w.Body.String())
 	}
 }
