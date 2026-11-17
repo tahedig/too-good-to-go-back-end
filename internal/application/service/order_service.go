@@ -259,3 +259,29 @@ func (s *orderService) VerifyPickup(ctx context.Context, vendorUserID string, or
 	return res, nil
 }
 
+func (s *orderService) UpdateVendorOrderStatus(ctx context.Context, vendorUserID string, orderID string, status string, reason string) (*model.VendorOrderStatusUpdateResult, error) {
+	if vendorUserID == "" {
+		return nil, exception.NewUnauthorized("authentication required")
+	}
+	orderID = strings.TrimSpace(orderID)
+	if orderID == "" {
+		return nil, exception.NewBadRequest("order id is required", nil)
+	}
+
+	targetDBStatus, _, ok := enum.ParseVendorTargetStatus(strings.TrimSpace(status))
+	if !ok {
+		return nil, exception.NewBadRequest("invalid target status", []exception.FieldError{
+			{Field: "status", Message: "must be ready_for_pickup, ready, cancelled, or no_show"},
+		})
+	}
+
+	res, err := s.orders.UpdateVendorOrderStatus(ctx, vendorUserID, orderID, targetDBStatus, strings.TrimSpace(reason))
+	if err != nil {
+		if appErr, ok := err.(exception.AppError); ok {
+			return nil, appErr
+		}
+		return nil, exception.NewInternalServer(err)
+	}
+	return res, nil
+}
+

@@ -177,6 +177,10 @@ func (failingOrders) VerifyPickup(context.Context, string, string, string) (*mod
 	return nil, errors.New("db down")
 }
 
+func (failingOrders) UpdateVendorOrderStatus(context.Context, string, string, enum.OrderStatus, string) (*model.VendorOrderStatusUpdateResult, error) {
+	return nil, errors.New("db down")
+}
+
 func TestListMyOrdersHidesStorageErrors(t *testing.T) {
 	_, err := NewOrderService(failingOrders{}).ListMyOrders(context.Background(), aliceID, serviceinterface.ListOrdersInput{})
 	if !isCode(err, exception.CodeInternalServer) {
@@ -417,6 +421,80 @@ func TestVerifyPickup(t *testing.T) {
 	// Order not found
 	if _, err := svc.VerifyPickup(context.Background(), vendorID, "non-existent", "1234"); !isCode(err, exception.CodeNotFound) {
 		t.Fatalf("expected not found, got %v", err)
+	}
+}
+
+func TestUpdateVendorOrderStatusAndInventory(t *testing.T) {
+	repo := memory.NewOrderRepository()
+	svc := NewOrderService(repo)
+	vendorID := aliceID
+	otherVendorID := bobID
+
+	repo.SetOfferStock("pkg-1", 1)
+	repo.AddVendorOrder(vendorID, model.VendorOrder{
+		ID:       "ord-paid",
+		Status:   enum.VendorOrderStatusActive,
+		DBStatus: enum.OrderStatusPaid,
+		Package:  model.VendorOrderPackage{ID: "pkg-1", Title: "Bread"},
+		Quantity: 2,
+	})
+	repo.AddVendorOrder(vendorID, model.VendorOrder{
+		ID:       "ord-pending",
+		Status:   enum.VendorOrderStatusActive,
+		DBStatus: enum.OrderStatusPendingPayment,
+		Package:  model.VendorOrderPackage{ID: "pkg-1", Title: "Bread"},
+		Quantity: 1,
+	})
+	repo.AddVendorOrder(vendorID, model.VendorOrder{
+		ID:       "ord-noshow",
+		Status:   enum.VendorOrderStatusReadyForPickup,
+		DBStatus: enum.OrderStatusReady,
+		Package:  model.VendorOrderPackage{ID: "pkg-1", Title: "Bread"},
+		Quantity: 1,
+	})
+
+	// Cross-vendor ownership rejected
+	if _, err := svc.UpdateVendorOrderStatus(context.Background(), otherVendorID, "ord-paid", "ready_for_pickup", ""); !isCode(err, exception.CodeNotFound) {
+		t.Fatalf("expected not found for other vendor, got %v", err)
+	}
+
+	// Invalid target status -> 400
+	if _, err := svc.UpdateVendorOrderStatus(context.Background(), vendorID, "ord-paid", "delivered", ""); !isCode(err, exception.CodeBadRequest) {
+		t.Fatalf("expected bad request for invalid target status, got %v", err)
+	}
+
+	// pending_payment cannot transition to ready_for_pickup -> 409
+	if _, err := svc.UpdateVendorOrderStatus(context.Background(), vendorID, "ord-pending", "ready_for_pickup", ""); !isCode(err, exception.CodeConflict) {
+		t.Fatalf("expected conflict for pending_payment -> ready, got %v", err)
+	}
+
+	// paid -> ready_for_pickup succeeds without restoring stock
+	res, err := svc.UpdateVendorOrderStatus(context.Background(), vendorID, "ord-paid", "ready_for_pickup", "")
+	if err != nil || !res.Success || res.Status != enum.VendorOrderStatusReadyForPickup {
+		t.Fatalf("ready transition failed: res=%+v err=%v", res, err)
+	}
+	if stock := repo.GetOfferStock("pkg-1"); stock != 1 {
+		t.Fatalf("expected stock unchanged at 1, got %d", stock)
+	}
+
+	// ready_for_pickup -> cancelled restores offer inventory
+	res, err = svc.UpdateVendorOrderStatus(context.Background(), vendorID, "ord-paid", "cancelled", "out of stock")
+	if err != nil || !res.Success || res.Status != enum.VendorOrderStatusCancelled {
+		t.Fatalf("cancel transition failed: res=%+v err=%v", res, err)
+	}
+	if stock := repo.GetOfferStock("pkg-1"); stock != 3 {
+		t.Fatalf("expected stock restored to 3, got %d", stock)
+	}
+
+	// cancelled -> ready_for_pickup is invalid -> 409
+	if _, err := svc.UpdateVendorOrderStatus(context.Background(), vendorID, "ord-paid", "ready_for_pickup", ""); !isCode(err, exception.CodeConflict) {
+		t.Fatalf("expected conflict for cancelled -> ready, got %v", err)
+	}
+
+	// ready -> no_show succeeds
+	res, err = svc.UpdateVendorOrderStatus(context.Background(), vendorID, "ord-noshow", "no_show", "")
+	if err != nil || !res.Success || res.Status != enum.VendorOrderStatusCancelled {
+		t.Fatalf("no_show transition failed: res=%+v err=%v", res, err)
 	}
 }
 

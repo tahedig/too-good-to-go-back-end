@@ -129,3 +129,18 @@ type VerifyPickupResponse struct {
 	Message     string `json:"message" example:"تحویل بسته با موفقیت ثبت شد"`
 }
 
+// UpdateVendorOrderStatusRequest is the request payload to transition a vendor order status.
+type UpdateVendorOrderStatusRequest struct {
+	Status string `json:"status" binding:"required" example:"ready_for_pickup" enums:"ready_for_pickup,ready,cancelled,no_show"`
+	Reason string `json:"reason,omitempty" example:"عدم مراجعه مشتری"`
+}
+
+// UpdateVendorOrderStatusResponse is the response after transitioning a vendor order status.
+type UpdateVendorOrderStatusResponse struct {
+	Success   bool   `json:"success" example:"true"`
+	OrderID   string `json:"order_id" example:"ord_12345"`
+	Status    string `json:"status" example:"ready_for_pickup"`
+	UpdatedAt string `json:"updated_at" example:"2026-10-19T18:00:00Z"`
+	Message   string `json:"message" example:"وضعیت سفارش با موفقیت به‌روزرسانی شد"`
+}
+

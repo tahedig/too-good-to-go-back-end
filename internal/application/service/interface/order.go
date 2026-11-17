@@ -58,5 +58,8 @@ type OrderService interface {
 
 	// VerifyPickup verifies the pickup code and marks the order as delivered.
 	VerifyPickup(ctx context.Context, vendorUserID string, orderID string, pickupCode string) (*model.VerifyPickupResult, error)
+
+	// UpdateVendorOrderStatus transitions an order to ready_for_pickup, cancelled, or no_show.
+	UpdateVendorOrderStatus(ctx context.Context, vendorUserID string, orderID string, status string, reason string) (*model.VendorOrderStatusUpdateResult, error)
 }
 
