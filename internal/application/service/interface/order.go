@@ -22,8 +22,41 @@ type OrderPage struct {
 	NextCursor string
 }
 
+// VendorOrderListInput holds query filters for listing vendor orders.
+type VendorOrderListInput struct {
+	Date   string
+	Status string
+	Page   int
+	Limit  int
+}
+
+// VendorOrderListPage wraps paginated vendor orders with pagination details.
+type VendorOrderListPage struct {
+	Orders     []model.VendorOrder
+	TotalItems int
+	Page       int
+	Limit      int
+	TotalPages int
+}
+
 type OrderService interface {
 	// ListMyOrders lists the orders of the user with this public ID. Only
 	// their own orders are ever returned.
 	ListMyOrders(ctx context.Context, userID string, in ListOrdersInput) (*OrderPage, error)
+
+	// GetVendorStore returns the active store belonging to the authenticated vendor.
+	GetVendorStore(ctx context.Context, vendorUserID string) (*model.VendorStoreActive, error)
+
+	// ListVendorOrders returns paginated vendor orders matching the filters.
+	ListVendorOrders(ctx context.Context, vendorUserID string, in VendorOrderListInput) (*VendorOrderListPage, error)
+
+	// GetVendorOrder returns details of a single vendor order.
+	GetVendorOrder(ctx context.Context, vendorUserID string, orderID string) (*model.VendorOrder, error)
+
+	// GetVendorOrderSummary returns daily summary stats for the vendor orders.
+	GetVendorOrderSummary(ctx context.Context, vendorUserID string, date string) (*model.VendorOrderSummary, error)
+
+	// VerifyPickup verifies the pickup code and marks the order as delivered.
+	VerifyPickup(ctx context.Context, vendorUserID string, orderID string, pickupCode string) (*model.VerifyPickupResult, error)
 }
+

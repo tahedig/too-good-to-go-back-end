@@ -47,3 +47,85 @@ type OrderItemResponse struct {
 	Quantity  int    `json:"quantity" example:"1"`
 	UnitPrice int64  `json:"unit_price" example:"40000"`
 }
+
+// VendorStoreActiveResponse is the response for the vendor's active store details.
+type VendorStoreActiveResponse struct {
+	ID       string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Name     string `json:"name" example:"نانوایی سنتی شمیران"`
+	Address  string `json:"address" example:"تهران، خیابان ولیعصر، پلاک ۱۲"`
+	Phone    string `json:"phone" example:"+982122334455"`
+	IsActive bool   `json:"is_active" example:"true"`
+}
+
+// VendorCustomerDTO is customer info in vendor order representations.
+type VendorCustomerDTO struct {
+	ID    string `json:"id" example:"cust_101"`
+	Name  string `json:"name" example:"لیلا علیزاده"`
+	Phone string `json:"phone" example:"+989123456789"`
+}
+
+// VendorPackageDTO is package info in vendor order representations.
+type VendorPackageDTO struct {
+	ID       string `json:"id" example:"pkg_501"`
+	Title    string `json:"title" example:"بستهٔ غافلگیری نانوایی"`
+	ImageURL string `json:"image_url" example:"https://example.com/bread.jpg"`
+}
+
+// VendorTimeSlotDTO is the pickup time slot.
+type VendorTimeSlotDTO struct {
+	StartTime string `json:"start_time" example:"18:00"`
+	EndTime   string `json:"end_time" example:"19:00"`
+}
+
+// VendorOrderItemResponse is one order item in the vendor orders list or detail.
+type VendorOrderItemResponse struct {
+	ID             string            `json:"id" example:"ord_12345"`
+	OrderNumber    string            `json:"order_number" example:"TG-9821"`
+	Customer       VendorCustomerDTO `json:"customer"`
+	Package        VendorPackageDTO  `json:"package"`
+	Quantity       int               `json:"quantity" example:"1"`
+	UnitPrice      int64             `json:"unit_price" example:"40000"`
+	TotalPrice     int64             `json:"total_price" example:"40000"`
+	Status         string            `json:"status" example:"active"`
+	PickupDate     string            `json:"pickup_date" example:"2026-10-19"`
+	PickupTimeSlot VendorTimeSlotDTO `json:"pickup_time_slot"`
+	CreatedAt      string            `json:"created_at" example:"2026-10-19T14:30:00Z"`
+}
+
+// VendorPaginationDTO contains pagination metadata for vendor orders list.
+type VendorPaginationDTO struct {
+	Page       int `json:"page" example:"1"`
+	Limit      int `json:"limit" example:"20"`
+	TotalItems int `json:"total_items" example:"2"`
+	TotalPages int `json:"total_pages" example:"1"`
+}
+
+// VendorOrderListResponse is the paginated response for vendor orders list.
+type VendorOrderListResponse struct {
+	Orders     []VendorOrderItemResponse `json:"orders"`
+	Pagination VendorPaginationDTO       `json:"pagination"`
+}
+
+// VendorOrderSummaryResponse represents daily summary statistics for vendor orders.
+type VendorOrderSummaryResponse struct {
+	Date                    string `json:"date" example:"2026-10-19"`
+	TotalReservedPackages   int    `json:"total_reserved_packages" example:"3"`
+	ActiveReservationsCount int    `json:"active_reservations_count" example:"2"`
+	DeliveredPackagesCount  int    `json:"delivered_packages_count" example:"0"`
+	TotalRevenue            int64  `json:"total_revenue" example:"120000"`
+}
+
+// VerifyPickupRequest is the request payload to verify an order pickup.
+type VerifyPickupRequest struct {
+	PickupCode string `json:"pickup_code" example:"1234"`
+}
+
+// VerifyPickupResponse is the response after successfully verifying an order pickup.
+type VerifyPickupResponse struct {
+	Success     bool   `json:"success" example:"true"`
+	OrderID     string `json:"order_id" example:"ord_12345"`
+	Status      string `json:"status" example:"delivered"`
+	DeliveredAt string `json:"delivered_at" example:"2026-10-19T18:15:00Z"`
+	Message     string `json:"message" example:"تحویل بسته با موفقیت ثبت شد"`
+}
+
