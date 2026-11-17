@@ -17,8 +17,9 @@ const (
 	docsPathPrefix = "/swagger/"
 )
 
-// SecurityHeaders sets conservative defaults suitable for a JSON API. HSTS is
-// left to the TLS-terminating proxy, which knows whether HTTPS is in use.
+// SecurityHeaders sets conservative defaults suitable for a JSON API.
+// Swagger UI receives a separate CSP policy so its local assets can load.
+// HSTS is left to the TLS-terminating proxy.
 func SecurityHeaders() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		h := c.Writer.Header()
