@@ -685,6 +685,18 @@ definitions:
         example: 2
         type: integer
     type: object
+  dto.VendorCustomerDTO:
+    properties:
+      id:
+        example: cust_101
+        type: string
+      name:
+        example: لیلا علیزاده
+        type: string
+      phone:
+        example: "+989123456789"
+        type: string
+    type: object
   dto.VendorDecisionRequest:
     properties:
       message:
@@ -734,6 +746,93 @@ definitions:
         example: 37
         type: integer
     type: object
+  dto.VendorOrderItemResponse:
+    properties:
+      created_at:
+        example: "2026-10-19T14:30:00Z"
+        type: string
+      customer:
+        $ref: '#/definitions/dto.VendorCustomerDTO'
+      id:
+        example: ord_12345
+        type: string
+      order_number:
+        example: TG-9821
+        type: string
+      package:
+        $ref: '#/definitions/dto.VendorPackageDTO'
+      pickup_date:
+        example: "2026-10-19"
+        type: string
+      pickup_time_slot:
+        $ref: '#/definitions/dto.VendorTimeSlotDTO'
+      quantity:
+        example: 1
+        type: integer
+      status:
+        example: active
+        type: string
+      total_price:
+        example: 40000
+        type: integer
+      unit_price:
+        example: 40000
+        type: integer
+    type: object
+  dto.VendorOrderListResponse:
+    properties:
+      orders:
+        items:
+          $ref: '#/definitions/dto.VendorOrderItemResponse'
+        type: array
+      pagination:
+        $ref: '#/definitions/dto.VendorPaginationDTO'
+    type: object
+  dto.VendorOrderSummaryResponse:
+    properties:
+      active_reservations_count:
+        example: 2
+        type: integer
+      date:
+        example: "2026-10-19"
+        type: string
+      delivered_packages_count:
+        example: 0
+        type: integer
+      total_reserved_packages:
+        example: 3
+        type: integer
+      total_revenue:
+        example: 120000
+        type: integer
+    type: object
+  dto.VendorPackageDTO:
+    properties:
+      id:
+        example: pkg_501
+        type: string
+      image_url:
+        example: https://example.com/bread.jpg
+        type: string
+      title:
+        example: بستهٔ غافلگیری نانوایی
+        type: string
+    type: object
+  dto.VendorPaginationDTO:
+    properties:
+      limit:
+        example: 20
+        type: integer
+      page:
+        example: 1
+        type: integer
+      total_items:
+        example: 2
+        type: integer
+      total_pages:
+        example: 1
+        type: integer
+    type: object
   dto.VendorResponse:
     properties:
       address:
@@ -779,6 +878,33 @@ definitions:
         example: "2026-10-19T07:10:00Z"
         type: string
     type: object
+  dto.VendorStoreActiveResponse:
+    properties:
+      address:
+        example: تهران، خیابان ولیعصر، پلاک ۱۲
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      is_active:
+        example: true
+        type: boolean
+      name:
+        example: نانوایی سنتی شمیران
+        type: string
+      phone:
+        example: "+982122334455"
+        type: string
+    type: object
+  dto.VendorTimeSlotDTO:
+    properties:
+      end_time:
+        example: "19:00"
+        type: string
+      start_time:
+        example: "18:00"
+        type: string
+    type: object
   dto.VerifyOTPRequest:
     properties:
       code:
@@ -806,6 +932,30 @@ definitions:
       user:
         $ref: '#/definitions/dto.AuthUserInfo'
       verified:
+        example: true
+        type: boolean
+    type: object
+  dto.VerifyPickupRequest:
+    properties:
+      pickup_code:
+        example: "1234"
+        type: string
+    type: object
+  dto.VerifyPickupResponse:
+    properties:
+      delivered_at:
+        example: "2026-10-19T18:15:00Z"
+        type: string
+      message:
+        example: تحویل بسته با موفقیت ثبت شد
+        type: string
+      order_id:
+        example: ord_12345
+        type: string
+      status:
+        example: delivered
+        type: string
+      success:
         example: true
         type: boolean
     type: object
@@ -2003,6 +2153,201 @@ paths:
       summary: Vendor-only test route
       tags:
       - rbac
+  /vendor/orders:
+    get:
+      description: Lists orders and reservations for the vendor's active store with
+        filtering by date and status, and pagination.
+      parameters:
+      - description: Filter by pickup date (YYYY-MM-DD)
+        in: query
+        name: date
+        type: string
+      - description: 'Filter by order status: all, active, ready_for_pickup, delivered,
+          cancelled'
+        enum:
+        - all
+        - active
+        - ready_for_pickup
+        - delivered
+        - cancelled
+        in: query
+        name: status
+        type: string
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (default 20, max 50)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VendorOrderListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List vendor reservations and orders
+      tags:
+      - vendor
+  /vendor/orders/{id}:
+    get:
+      description: Retrieves detailed information for a specific vendor order.
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VendorOrderItemResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get vendor order details
+      tags:
+      - vendor
+  /vendor/orders/{id}/verify-pickup:
+    post:
+      consumes:
+      - application/json
+      description: Marks an order as delivered/completed after checking pickup code
+        and vendor store ownership.
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Pickup verification body
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/dto.VerifyPickupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VerifyPickupResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Verify order pickup
+      tags:
+      - vendor
+  /vendor/orders/summary:
+    get:
+      description: Aggregates daily order count, active reservations count, delivered
+        count and total revenue for the vendor.
+      parameters:
+      - description: Summary date (YYYY-MM-DD, defaults to today)
+        in: query
+        name: date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VendorOrderSummaryResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get vendor orders summary stats
+      tags:
+      - vendor
+  /vendor/store:
+    get:
+      description: Retrieves store information for the active store of the authenticated
+        vendor.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VendorStoreActiveResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get active vendor store
+      tags:
+      - vendor
   /vendor/store-requests:
     get:
       consumes:
