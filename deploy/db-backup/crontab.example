@@ -1,0 +1,3 @@
+# Alternative to systemd timers (as user tgtg-backup)
+0 3 * * *  DB_BACKUP_ENV=/etc/tgtg/db-backup.env /opt/tgtg/scripts/db/backup.sh  >> /var/log/tgtg-backup.log 2>&1
+0 4 * * 0  DB_BACKUP_ENV=/etc/tgtg/db-backup.env /opt/tgtg/scripts/db/restore.sh >> /var/log/tgtg-backup.log 2>&1
