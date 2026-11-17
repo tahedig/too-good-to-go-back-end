@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/enum"
+	"github.com/tahedig/too-good-to-go/backend/internal/domain/exception"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/model"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/repository"
 	"github.com/tahedig/too-good-to-go/backend/pkg/security"
@@ -146,3 +148,413 @@ func scanOrder(row pgx.CollectableRow) (model.Order, error) {
 	}
 	return o, nil
 }
+
+func (r *orderRepository) GetActiveStoreByVendorUser(ctx context.Context, vendorUserID string) (*model.VendorStoreActive, error) {
+	if !security.IsID(vendorUserID) {
+		return nil, exception.ErrStoreNotFound
+	}
+
+	const query = `
+SELECT s.public_id::text, s.name, s.address_line, COALESCE(s.phone, ''), s.is_active
+FROM stores s
+JOIN users u ON u.id = s.vendor_id
+WHERE u.public_id = $1::uuid AND s.deleted_at IS NULL
+ORDER BY s.is_active DESC, s.created_at DESC
+LIMIT 1`
+
+	var s model.VendorStoreActive
+	err := r.pool.QueryRow(ctx, query, vendorUserID).Scan(
+		&s.ID, &s.Name, &s.Address, &s.Phone, &s.IsActive,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, exception.ErrStoreNotFound
+		}
+		return nil, fmt.Errorf("get active store by vendor user: %w", err)
+	}
+	return &s, nil
+}
+
+func (r *orderRepository) ListVendorOrders(ctx context.Context, vendorUserID string, filter repository.VendorOrderFilter) ([]model.VendorOrder, int, error) {
+	if !security.IsID(vendorUserID) {
+		return []model.VendorOrder{}, 0, nil
+	}
+
+	var statusFilter []string
+	if filter.Status != "" && filter.Status != "all" {
+		dbStatuses := enum.VendorFilterToOrderStatuses(filter.Status)
+		for _, s := range dbStatuses {
+			statusFilter = append(statusFilter, string(s))
+		}
+	}
+
+	offset := (filter.Page - 1) * filter.Limit
+
+	const query = `
+WITH filtered AS (
+    SELECT o.id, o.public_id::text, o.status::text, o.items_total, o.pickup_code, o.completed_at, o.created_at,
+           u.public_id::text AS cust_id, u.full_name AS cust_name, u.phone AS cust_phone,
+           it.offer_public_id, it.title_snapshot, it.image_url, it.quantity, it.unit_price,
+           it.pickup_start, it.pickup_end
+    FROM orders o
+    JOIN stores s ON s.id = o.store_id
+    JOIN users v ON v.id = s.vendor_id
+    JOIN users u ON u.id = o.user_id
+    LEFT JOIN LATERAL (
+        SELECT f.public_id::text AS offer_public_id, oi.title_snapshot, f.image_url,
+               oi.quantity, oi.unit_price, f.pickup_start, f.pickup_end
+        FROM order_items oi
+        JOIN offers f ON f.id = oi.offer_id
+        WHERE oi.order_id = o.id
+        ORDER BY oi.id ASC
+        LIMIT 1
+    ) it ON true
+    WHERE v.public_id = $1::uuid AND s.deleted_at IS NULL
+      AND ($2::text = '' OR TO_CHAR(COALESCE(it.pickup_start, o.created_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD') = $2)
+      AND ($3::text[] IS NULL OR o.status::text = ANY($3::text[]))
+)
+SELECT id, public_id, status, items_total, pickup_code, completed_at, created_at,
+       cust_id, cust_name, cust_phone,
+       COALESCE(offer_public_id, ''), COALESCE(title_snapshot, ''), COALESCE(image_url, ''),
+       COALESCE(quantity, 1), COALESCE(unit_price, items_total),
+       pickup_start, pickup_end,
+       COUNT(*) OVER() AS total_count
+FROM filtered
+ORDER BY created_at DESC, id DESC
+LIMIT $4 OFFSET $5`
+
+	rows, err := r.pool.Query(ctx, query, vendorUserID, filter.Date, statusFilter, filter.Limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list vendor orders: %w", err)
+	}
+	defer rows.Close()
+
+	var orders []model.VendorOrder
+	totalCount := 0
+
+	for rows.Next() {
+		var (
+			numericID      int64
+			publicID       string
+			statusStr      string
+			itemsTotal     int64
+			pickupCode     string
+			completedAt    *time.Time
+			createdAt      time.Time
+			custID         string
+			custName       string
+			custPhone      string
+			offerID        string
+			offerTitle     string
+			offerImage     string
+			quantity       int
+			unitPrice      int64
+			pickupStart    *time.Time
+			pickupEnd      *time.Time
+			count          int
+		)
+
+		if err := rows.Scan(
+			&numericID, &publicID, &statusStr, &itemsTotal, &pickupCode, &completedAt, &createdAt,
+			&custID, &custName, &custPhone,
+			&offerID, &offerTitle, &offerImage,
+			&quantity, &unitPrice,
+			&pickupStart, &pickupEnd,
+			&count,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan vendor order: %w", err)
+		}
+
+		totalCount = count
+		dbStatus := enum.OrderStatus(statusStr)
+		vendorStatus := dbStatus.ToVendorStatus()
+
+		pickupDate := createdAt.UTC().Format("2006-01-02")
+		startTime := "00:00"
+		endTime := "23:59"
+		if pickupStart != nil {
+			pickupDate = pickupStart.UTC().Format("2006-01-02")
+			startTime = pickupStart.UTC().Format("15:04")
+		}
+		if pickupEnd != nil {
+			endTime = pickupEnd.UTC().Format("15:04")
+		}
+
+		orderNumber := fmt.Sprintf("TG-%04d", numericID%10000)
+
+		orders = append(orders, model.VendorOrder{
+			ID:          publicID,
+			NumericID:   numericID,
+			OrderNumber: orderNumber,
+			Customer: model.VendorOrderCustomer{
+				ID:    custID,
+				Name:  custName,
+				Phone: custPhone,
+			},
+			Package: model.VendorOrderPackage{
+				ID:       offerID,
+				Title:    offerTitle,
+				ImageURL: offerImage,
+			},
+			Quantity:   quantity,
+			UnitPrice:  unitPrice,
+			TotalPrice: itemsTotal,
+			Status:     vendorStatus,
+			PickupDate: pickupDate,
+			PickupTimeSlot: model.VendorOrderTimeSlot{
+				StartTime: startTime,
+				EndTime:   endTime,
+			},
+			PickupCode:  pickupCode,
+			DeliveredAt: completedAt,
+			CreatedAt:   createdAt.UTC(),
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("rows error: %w", err)
+	}
+
+	return orders, totalCount, nil
+}
+
+func (r *orderRepository) GetVendorOrderByID(ctx context.Context, vendorUserID string, orderID string) (*model.VendorOrder, error) {
+	if !security.IsID(vendorUserID) {
+		return nil, exception.ErrOrderNotFound
+	}
+
+	const query = `
+SELECT o.id, o.public_id::text, o.status::text, o.items_total, o.pickup_code, o.completed_at, o.created_at,
+       u.public_id::text AS cust_id, u.full_name AS cust_name, u.phone AS cust_phone,
+       COALESCE(it.offer_public_id, ''), COALESCE(it.title_snapshot, ''), COALESCE(it.image_url, ''),
+       COALESCE(it.quantity, 1), COALESCE(it.unit_price, o.items_total),
+       it.pickup_start, it.pickup_end
+FROM orders o
+JOIN stores s ON s.id = o.store_id
+JOIN users v ON v.id = s.vendor_id
+JOIN users u ON u.id = o.user_id
+LEFT JOIN LATERAL (
+    SELECT f.public_id::text AS offer_public_id, oi.title_snapshot, f.image_url,
+           oi.quantity, oi.unit_price, f.pickup_start, f.pickup_end
+    FROM order_items oi
+    JOIN offers f ON f.id = oi.offer_id
+    WHERE oi.order_id = o.id
+    ORDER BY oi.id ASC
+    LIMIT 1
+) it ON true
+WHERE v.public_id = $1::uuid AND s.deleted_at IS NULL
+  AND (o.public_id::text = $2 OR o.id::text = $2)
+LIMIT 1`
+
+	var (
+		numericID   int64
+		publicID    string
+		statusStr   string
+		itemsTotal  int64
+		pickupCode  string
+		completedAt *time.Time
+		createdAt   time.Time
+		custID      string
+		custName    string
+		custPhone   string
+		offerID     string
+		offerTitle  string
+		offerImage  string
+		quantity    int
+		unitPrice   int64
+		pickupStart *time.Time
+		pickupEnd   *time.Time
+	)
+
+	err := r.pool.QueryRow(ctx, query, vendorUserID, orderID).Scan(
+		&numericID, &publicID, &statusStr, &itemsTotal, &pickupCode, &completedAt, &createdAt,
+		&custID, &custName, &custPhone,
+		&offerID, &offerTitle, &offerImage,
+		&quantity, &unitPrice,
+		&pickupStart, &pickupEnd,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, exception.ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get vendor order by id: %w", err)
+	}
+
+	dbStatus := enum.OrderStatus(statusStr)
+	vendorStatus := dbStatus.ToVendorStatus()
+
+	pickupDate := createdAt.UTC().Format("2006-01-02")
+	startTime := "00:00"
+	endTime := "23:59"
+	if pickupStart != nil {
+		pickupDate = pickupStart.UTC().Format("2006-01-02")
+		startTime = pickupStart.UTC().Format("15:04")
+	}
+	if pickupEnd != nil {
+		endTime = pickupEnd.UTC().Format("15:04")
+	}
+
+	orderNumber := fmt.Sprintf("TG-%04d", numericID%10000)
+
+	return &model.VendorOrder{
+		ID:          publicID,
+		NumericID:   numericID,
+		OrderNumber: orderNumber,
+		Customer: model.VendorOrderCustomer{
+			ID:    custID,
+			Name:  custName,
+			Phone: custPhone,
+		},
+		Package: model.VendorOrderPackage{
+			ID:       offerID,
+			Title:    offerTitle,
+			ImageURL: offerImage,
+		},
+		Quantity:   quantity,
+		UnitPrice:  unitPrice,
+		TotalPrice: itemsTotal,
+		Status:     vendorStatus,
+		PickupDate: pickupDate,
+		PickupTimeSlot: model.VendorOrderTimeSlot{
+			StartTime: startTime,
+			EndTime:   endTime,
+		},
+		PickupCode:  pickupCode,
+		DeliveredAt: completedAt,
+		CreatedAt:   createdAt.UTC(),
+	}, nil
+}
+
+func (r *orderRepository) GetVendorOrderSummary(ctx context.Context, vendorUserID string, date string) (*model.VendorOrderSummary, error) {
+	if !security.IsID(vendorUserID) {
+		return &model.VendorOrderSummary{Date: date}, nil
+	}
+
+	const query = `
+SELECT
+    COALESCE(SUM(CASE WHEN o.status IN ('paid', 'ready', 'completed') THEN COALESCE(it.quantity, 1) ELSE 0 END), 0) AS total_reserved_packages,
+    COALESCE(COUNT(CASE WHEN o.status IN ('paid', 'ready') THEN 1 END), 0) AS active_reservations_count,
+    COALESCE(COUNT(CASE WHEN o.status = 'completed' THEN 1 END), 0) AS delivered_packages_count,
+    COALESCE(SUM(CASE WHEN o.status IN ('paid', 'ready', 'completed') THEN o.items_total ELSE 0 END), 0) AS total_revenue
+FROM orders o
+JOIN stores s ON s.id = o.store_id
+JOIN users v ON v.id = s.vendor_id
+LEFT JOIN LATERAL (
+    SELECT SUM(oi.quantity) AS quantity, MIN(f.pickup_start) AS pickup_start
+    FROM order_items oi
+    JOIN offers f ON f.id = oi.offer_id
+    WHERE oi.order_id = o.id
+) it ON true
+WHERE v.public_id = $1::uuid AND s.deleted_at IS NULL
+  AND TO_CHAR(COALESCE(it.pickup_start, o.created_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD') = $2`
+
+	var (
+		totalReservedPackages   int
+		activeReservationsCount int
+		deliveredPackagesCount  int
+		totalRevenue            int64
+	)
+
+	err := r.pool.QueryRow(ctx, query, vendorUserID, date).Scan(
+		&totalReservedPackages,
+		&activeReservationsCount,
+		&deliveredPackagesCount,
+		&totalRevenue,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get vendor order summary: %w", err)
+	}
+
+	return &model.VendorOrderSummary{
+		Date:                    date,
+		TotalReservedPackages:   totalReservedPackages,
+		ActiveReservationsCount: activeReservationsCount,
+		DeliveredPackagesCount:  deliveredPackagesCount,
+		TotalRevenue:            totalRevenue,
+	}, nil
+}
+
+func (r *orderRepository) VerifyPickup(ctx context.Context, vendorUserID string, orderID string, pickupCode string) (*model.VerifyPickupResult, error) {
+	if !security.IsID(vendorUserID) {
+		return nil, exception.ErrOrderNotFound
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin verify pickup tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	const selectQuery = `
+SELECT o.id, o.public_id::text, o.status::text, o.pickup_code, v.id AS vendor_id
+FROM orders o
+JOIN stores s ON s.id = o.store_id
+JOIN users v ON v.id = s.vendor_id
+WHERE v.public_id = $1::uuid AND s.deleted_at IS NULL
+  AND (o.public_id::text = $2 OR o.id::text = $2)
+FOR UPDATE OF o`
+
+	var (
+		orderNumericID int64
+		orderPublicID  string
+		statusStr      string
+		dbPickupCode   string
+		vendorNumID    int64
+	)
+
+	err = tx.QueryRow(ctx, selectQuery, vendorUserID, orderID).Scan(
+		&orderNumericID, &orderPublicID, &statusStr, &dbPickupCode, &vendorNumID,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, exception.ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("select order for pickup verify: %w", err)
+	}
+
+	dbStatus := enum.OrderStatus(statusStr)
+	if dbStatus == enum.OrderStatusCompleted {
+		return nil, exception.ErrOrderAlreadyDelivered
+	}
+	if dbStatus == enum.OrderStatusCancelled || dbStatus == enum.OrderStatusExpired || dbStatus == enum.OrderStatusNoShow {
+		return nil, exception.ErrOrderCannotBeDelivered
+	}
+
+	if pickupCode != "" && dbPickupCode != "" && pickupCode != dbPickupCode {
+		return nil, exception.ErrInvalidPickupCode
+	}
+
+	now := time.Now().UTC()
+
+	const updateQuery = `
+UPDATE orders
+SET status = 'completed', confirmed_by = $1, completed_at = $2, updated_at = $2
+WHERE id = $3`
+
+	_, err = tx.Exec(ctx, updateQuery, vendorNumID, now, orderNumericID)
+	if err != nil {
+		return nil, fmt.Errorf("update order completed: %w", err)
+	}
+
+	const historyQuery = `
+INSERT INTO order_status_history (order_id, from_status, to_status, actor_user_id, reason, created_at)
+VALUES ($1, $2, 'completed', $3, 'pickup verified by vendor', $4)`
+
+	_, err = tx.Exec(ctx, historyQuery, orderNumericID, statusStr, vendorNumID, now)
+	if err != nil {
+		return nil, fmt.Errorf("insert order status history: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit verify pickup tx: %w", err)
+	}
+
+	return &model.VerifyPickupResult{
+		Success:     true,
+		OrderID:     orderPublicID,
+		Status:      enum.VendorOrderStatusDelivered,
+		DeliveredAt: now,
+		Message:     "تحویل بسته با موفقیت ثبت شد",
+	}, nil
+}
+
