@@ -40,6 +40,9 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 	smsSender := provideSMSSender(cfg, log)
 	authService := provideAuthService(cfg, log, injectorStorage, smsSender)
 	authHandler := handler.NewAuthHandler(authService, sessionService)
+	catalogueService := provideCatalogueService(injectorDatabase)
+	catalogueHandler := provideCatalogueHandler(catalogueService)
+	userAuth := provideUserAuth(cfg, catalogueService)
 	protectedHandler := handler.NewProtectedHandler()
 	profileService := provideProfileService(userRepository)
 	profileHandler := handler.NewProfileHandler(profileService)
@@ -49,7 +52,7 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 	vendorApprovalRepository := provideVendorApprovalRepository(injectorDatabase)
 	vendorApprovalService := service.NewVendorApprovalService(vendorApprovalRepository, log)
 	vendorApprovalHandler := handler.NewVendorApprovalHandler(vendorApprovalService)
-	handlers := provideHandlers(healthHandler, authHandler, protectedHandler, profileHandler, orderHandler, vendorApprovalHandler)
+	handlers := provideHandlers(healthHandler, authHandler, catalogueHandler, userAuth, protectedHandler, profileHandler, orderHandler, vendorApprovalHandler)
 	engine, err := router.New(cfg, log, errorHandler, authMiddleware, rateLimiter, handlers)
 	if err != nil {
 		cleanup2()

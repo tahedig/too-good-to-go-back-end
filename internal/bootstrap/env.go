@@ -57,9 +57,9 @@ type Config struct {
 	// RedisKeyPrefix namespaces every key, so environments can share a Redis.
 	RedisKeyPrefix string
 
-	// DatabaseURL (postgres://user:pass@host:port/db?sslmode=...) stores users
-	// and their roles. Required outside development; when empty in
-	// development users are kept in process memory.
+	// DatabaseURL configures PostgreSQL for users, orders, and catalogue endpoints.
+	// Required outside development; when empty in development, data is kept in memory
+	// and catalogue endpoints are not registered.
 	DatabaseURL string
 
 	// JWTSecret signs access tokens (HS256). Required outside development;
