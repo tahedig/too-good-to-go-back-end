@@ -164,3 +164,37 @@ func TestAdminStore_GetAndStatusToggle(t *testing.T) {
 		t.Fatalf("expected 400, got %d", rec.Code)
 	}
 }
+
+func TestAdminStore_GetSubscription(t *testing.T) {
+	env := newAdminStoreEnv(t)
+	env.seedStore()
+
+	upgrade := "حرفه‌ای"
+	env.repo.AddSubscription(model.AdminStoreSubscription{
+		ID:             "22222222-2222-4222-8222-222222222222",
+		StoreID:        adminStoreTestID,
+		Status:         "pending_review",
+		CurrentPlan:    "پایه - رایگان",
+		CommissionRate: 10,
+		PeriodStart:    time.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC),
+		PeriodEnd:      time.Date(2026, 10, 22, 23, 59, 59, 0, time.UTC),
+		RemainingDays:  3,
+		UpgradeRequest: &upgrade,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/stores/"+adminStoreTestID+"/subscription", nil)
+	req.Header.Set("Authorization", "Bearer "+env.tokens["admin"])
+	rec := httptest.NewRecorder()
+	env.r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var got dto.AdminStoreSubscriptionResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.Status != "pending_review" || got.CommissionRate != 10 || got.RemainingDays != 3 {
+		t.Fatalf("unexpected subscription response: %+v", got)
+	}
+}

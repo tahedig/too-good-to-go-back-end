@@ -10,13 +10,15 @@ import (
 
 // AdminStoreRepository keeps admin store details in memory for development and tests.
 type AdminStoreRepository struct {
-	mu     sync.RWMutex
-	stores map[string]*model.AdminStoreDetail
+	mu            sync.RWMutex
+	stores        map[string]*model.AdminStoreDetail
+	subscriptions map[string]*model.AdminStoreSubscription
 }
 
 func NewAdminStoreRepository() *AdminStoreRepository {
 	return &AdminStoreRepository{
-		stores: make(map[string]*model.AdminStoreDetail),
+		stores:        make(map[string]*model.AdminStoreDetail),
+		subscriptions: make(map[string]*model.AdminStoreSubscription),
 	}
 }
 
@@ -50,6 +52,27 @@ func (r *AdminStoreRepository) UpdateStoreStatus(_ context.Context, storeID stri
 	}
 	s.IsActive = isActive
 	cp := cloneAdminStore(*s)
+	return &cp, nil
+}
+
+func (r *AdminStoreRepository) AddSubscription(sub model.AdminStoreSubscription) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	cp := sub
+	r.subscriptions[sub.StoreID] = &cp
+}
+
+func (r *AdminStoreRepository) GetStoreSubscription(_ context.Context, storeID string) (*model.AdminStoreSubscription, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if _, ok := r.stores[storeID]; !ok {
+		return nil, repository.ErrAdminStoreNotFound
+	}
+	sub, ok := r.subscriptions[storeID]
+	if !ok {
+		return nil, repository.ErrAdminSubscriptionNotFound
+	}
+	cp := *sub
 	return &cp, nil
 }
 

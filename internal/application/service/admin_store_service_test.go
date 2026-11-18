@@ -108,3 +108,33 @@ func TestAdminStoreService_Errors(t *testing.T) {
 	_, err = svc.UpdateStoreStatus(ctx, testAdminStoreID, nil)
 	assertAppErrCode(t, err, exception.CodeBadRequest)
 }
+
+func TestAdminStoreService_Subscription(t *testing.T) {
+	svc, repo := newTestAdminStoreService()
+	seedTestStore(repo)
+	ctx := context.Background()
+
+	_, err := svc.GetStoreSubscription(ctx, testAdminStoreID)
+	assertAppErrCode(t, err, exception.CodeNotFound)
+
+	upgrade := "حرفه‌ای"
+	repo.AddSubscription(model.AdminStoreSubscription{
+		ID:             "22222222-2222-4222-8222-222222222222",
+		StoreID:        testAdminStoreID,
+		Status:         "pending_review",
+		CurrentPlan:    "پایه - رایگان",
+		CommissionRate: 10,
+		PeriodStart:    time.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC),
+		PeriodEnd:      time.Date(2026, 10, 22, 23, 59, 59, 0, time.UTC),
+		RemainingDays:  3,
+		UpgradeRequest: &upgrade,
+	})
+
+	sub, err := svc.GetStoreSubscription(ctx, testAdminStoreID)
+	if err != nil {
+		t.Fatalf("GetStoreSubscription error: %v", err)
+	}
+	if sub.CurrentPlan != "پایه - رایگان" || sub.RemainingDays != 3 || sub.UpgradeRequest == nil || *sub.UpgradeRequest != "حرفه‌ای" {
+		t.Fatalf("unexpected subscription: %+v", sub)
+	}
+}

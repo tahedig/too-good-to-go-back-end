@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	msgAdminStoreNotFound     = "فروشگاه پیدا نشد."
-	msgAdminStoreInvalidInput = "اطلاعات واردشده معتبر نیست."
+	msgAdminStoreNotFound        = "فروشگاه پیدا نشد."
+	msgAdminSubscriptionNotFound = "اشتراکی برای این فروشگاه ثبت نشده است."
+	msgAdminStoreInvalidInput    = "اطلاعات واردشده معتبر نیست."
 )
 
 type adminStoreService struct {
@@ -61,4 +62,21 @@ func (s *adminStoreService) UpdateStoreStatus(ctx context.Context, storeID strin
 		s.log.Info("admin updated store active status", "store_id", storeID, "is_active", *isActive)
 	}
 	return store, nil
+}
+
+func (s *adminStoreService) GetStoreSubscription(ctx context.Context, storeID string) (*model.AdminStoreSubscription, error) {
+	if !security.IsID(storeID) {
+		return nil, exception.NewNotFound(msgAdminStoreNotFound)
+	}
+	sub, err := s.repo.GetStoreSubscription(ctx, storeID)
+	if err != nil {
+		if errors.Is(err, repository.ErrAdminStoreNotFound) {
+			return nil, exception.NewNotFound(msgAdminStoreNotFound)
+		}
+		if errors.Is(err, repository.ErrAdminSubscriptionNotFound) {
+			return nil, exception.NewNotFound(msgAdminSubscriptionNotFound)
+		}
+		return nil, err
+	}
+	return sub, nil
 }

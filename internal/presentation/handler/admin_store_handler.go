@@ -70,6 +70,38 @@ func (h *adminStoreHandler) UpdateStoreStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, toAdminStoreDetailResponse(store))
 }
 
+// GetSubscription godoc
+// @Summary      Get store seller subscription (admin)
+// @Description  Returns the store's current subscription plan, commission rate, period, remaining days, and upgrade request.
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id  path  string  true  "Store ID"
+// @Success      200 {object} dto.AdminStoreSubscriptionResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      403 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Router       /admin/stores/{id}/subscription [get]
+func (h *adminStoreHandler) GetSubscription(c *gin.Context) {
+	sub, err := h.svc.GetStoreSubscription(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		abortWithError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, dto.AdminStoreSubscriptionResponse{
+		ID:             sub.ID,
+		StoreID:        sub.StoreID,
+		Status:         sub.Status,
+		CurrentPlan:    sub.CurrentPlan,
+		CommissionRate: sub.CommissionRate,
+		PeriodStart:    sub.PeriodStart,
+		PeriodEnd:      sub.PeriodEnd,
+		RemainingDays:  sub.RemainingDays,
+		UpgradeRequest: sub.UpgradeRequest,
+	})
+}
+
 func toAdminStoreDetailResponse(s *model.AdminStoreDetail) dto.AdminStoreDetailResponse {
 	hours := make([]dto.AdminStoreWorkingHourDTO, 0, len(s.WorkingHours))
 	for _, h := range s.WorkingHours {

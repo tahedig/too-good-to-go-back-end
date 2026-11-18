@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -102,4 +103,52 @@ WHERE public_id = $1::uuid AND deleted_at IS NULL`, storeID, isActive)
 		return nil, repository.ErrAdminStoreNotFound
 	}
 	return r.GetStore(ctx, storeID)
+}
+
+const selectStoreSubscriptionQuery = `
+SELECT ss.public_id::text, s.public_id::text, ss.status::text, p.name_fa,
+       ss.commission_rate::double precision, ss.period_start, ss.period_end,
+       GREATEST(0, CEIL(EXTRACT(EPOCH FROM (ss.period_end - now())) / 86400))::int,
+       up.name_fa
+FROM stores s
+LEFT JOIN LATERAL (
+    SELECT * FROM store_subscriptions
+    WHERE store_id = s.id
+    ORDER BY created_at DESC, id DESC
+    LIMIT 1
+) ss ON true
+LEFT JOIN subscription_plans p ON p.id = ss.plan_id
+LEFT JOIN subscription_plans up ON up.id = ss.upgrade_plan_id
+WHERE s.deleted_at IS NULL AND s.public_id = $1::uuid`
+
+func (r *adminStoreRepository) GetStoreSubscription(ctx context.Context, storeID string) (*model.AdminStoreSubscription, error) {
+	var subID, sID, status, planName, upgradePlan *string
+	var commission *float64
+	var periodStart, periodEnd *time.Time
+	var remainingDays *int
+
+	err := r.pool.QueryRow(ctx, selectStoreSubscriptionQuery, storeID).Scan(
+		&subID, &sID, &status, &planName, &commission,
+		&periodStart, &periodEnd, &remainingDays, &upgradePlan,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, repository.ErrAdminStoreNotFound
+		}
+		return nil, err
+	}
+	if subID == nil {
+		return nil, repository.ErrAdminSubscriptionNotFound
+	}
+	return &model.AdminStoreSubscription{
+		ID:             *subID,
+		StoreID:        *sID,
+		Status:         *status,
+		CurrentPlan:    *planName,
+		CommissionRate: *commission,
+		PeriodStart:    *periodStart,
+		PeriodEnd:      *periodEnd,
+		RemainingDays:  *remainingDays,
+		UpgradeRequest: upgradePlan,
+	}, nil
 }

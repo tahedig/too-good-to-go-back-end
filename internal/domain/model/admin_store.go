@@ -36,3 +36,16 @@ type AdminStoreWorkingHour struct {
 	CloseTime *string
 	IsClosed  bool
 }
+
+// AdminStoreSubscription holds the seller's current subscription and upgrade request.
+type AdminStoreSubscription struct {
+	ID             string
+	StoreID        string
+	Status         string
+	CurrentPlan    string
+	CommissionRate float64
+	PeriodStart    time.Time
+	PeriodEnd      time.Time
+	RemainingDays  int
+	UpgradeRequest *string
+}

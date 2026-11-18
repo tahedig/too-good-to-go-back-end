@@ -35,3 +35,15 @@ type AdminStoreWorkingHourDTO struct {
 type UpdateAdminStatusRequest struct {
 	IsActive *bool `json:"is_active" example:"false"`
 }
+
+type AdminStoreSubscriptionResponse struct {
+	ID             string    `json:"id" example:"660e8400-e29b-41d4-a716-446655440000"`
+	StoreID        string    `json:"store_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Status         string    `json:"status" example:"pending_review"`
+	CurrentPlan    string    `json:"current_plan" example:"پایه - رایگان"`
+	CommissionRate float64   `json:"commission_rate" example:"10"`
+	PeriodStart    time.Time `json:"period_start" example:"2026-09-23T00:00:00Z"`
+	PeriodEnd      time.Time `json:"period_end" example:"2026-10-22T23:59:59Z"`
+	RemainingDays  int       `json:"remaining_days" example:"3"`
+	UpgradeRequest *string   `json:"upgrade_request,omitempty" example:"حرفه‌ای"`
+}

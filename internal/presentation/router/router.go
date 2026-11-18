@@ -148,6 +148,7 @@ func New(
 		if h.AdminStore != nil {
 			admin.GET("/stores/:id", h.AdminStore.GetStore)
 			admin.PATCH("/stores/:id/status", h.AdminStore.UpdateStoreStatus)
+			admin.GET("/stores/:id/subscription", h.AdminStore.GetSubscription)
 		}
 	}
 
