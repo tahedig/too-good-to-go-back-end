@@ -1730,6 +1730,379 @@ const docTemplate = `{
                 }
             }
         },
+        "/vendor/orders": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists orders and reservations for the vendor's active store with filtering by date and status, and pagination.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendor"
+                ],
+                "summary": "List vendor reservations and orders",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by pickup date (YYYY-MM-DD)",
+                        "name": "date",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "all",
+                            "active",
+                            "ready_for_pickup",
+                            "delivered",
+                            "cancelled"
+                        ],
+                        "type": "string",
+                        "description": "Filter by order status: all, active, ready_for_pickup, delivered, cancelled",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 20, max 50)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorOrderListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vendor/orders/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Aggregates daily order count, active reservations count, delivered count and total revenue for the vendor.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendor"
+                ],
+                "summary": "Get vendor orders summary stats",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Summary date (YYYY-MM-DD, defaults to today)",
+                        "name": "date",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorOrderSummaryResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vendor/orders/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves detailed information for a specific vendor order.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendor"
+                ],
+                "summary": "Get vendor order details",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorOrderItemResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vendor/orders/{id}/status": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Transitions a vendor order to ready_for_pickup (ready), cancelled (restores offer inventory), or no_show. Enforces store ownership and valid state transitions.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendor"
+                ],
+                "summary": "Update vendor order status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Target status and optional reason",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateVendorOrderStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateVendorOrderStatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vendor/orders/{id}/verify-pickup": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Marks an order as delivered/completed after checking pickup code and vendor store ownership.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendor"
+                ],
+                "summary": "Verify order pickup",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Pickup verification body",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VerifyPickupRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VerifyPickupResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vendor/store": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves store information for the active store of the authenticated vendor.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendor"
+                ],
+                "summary": "Get active vendor store",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorStoreActiveResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/vendor/store-requests": {
             "get": {
                 "security": [
@@ -2989,6 +3362,53 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.UpdateVendorOrderStatusRequest": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "example": "عدم مراجعه مشتری"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "ready_for_pickup",
+                        "ready",
+                        "cancelled",
+                        "no_show"
+                    ],
+                    "example": "ready_for_pickup"
+                }
+            }
+        },
+        "dto.UpdateVendorOrderStatusResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "وضعیت سفارش با موفقیت به‌روزرسانی شد"
+                },
+                "order_id": {
+                    "type": "string",
+                    "example": "ord_12345"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "ready_for_pickup"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2026-10-19T18:00:00Z"
+                }
+            }
+        },
         "dto.VendorCountsResponse": {
             "type": "object",
             "properties": {
@@ -3007,6 +3427,23 @@ const docTemplate = `{
                 "suspended": {
                     "type": "integer",
                     "example": 2
+                }
+            }
+        },
+        "dto.VendorCustomerDTO": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "cust_101"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "لیلا علیزاده"
+                },
+                "phone": {
+                    "type": "string",
+                    "example": "+989123456789"
                 }
             }
         },
@@ -3081,6 +3518,129 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.VendorOrderItemResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-10-19T14:30:00Z"
+                },
+                "customer": {
+                    "$ref": "#/definitions/dto.VendorCustomerDTO"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "ord_12345"
+                },
+                "order_number": {
+                    "type": "string",
+                    "example": "TG-9821"
+                },
+                "package": {
+                    "$ref": "#/definitions/dto.VendorPackageDTO"
+                },
+                "pickup_date": {
+                    "type": "string",
+                    "example": "2026-10-19"
+                },
+                "pickup_time_slot": {
+                    "$ref": "#/definitions/dto.VendorTimeSlotDTO"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "status": {
+                    "type": "string",
+                    "example": "active"
+                },
+                "total_price": {
+                    "type": "integer",
+                    "example": 40000
+                },
+                "unit_price": {
+                    "type": "integer",
+                    "example": 40000
+                }
+            }
+        },
+        "dto.VendorOrderListResponse": {
+            "type": "object",
+            "properties": {
+                "orders": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.VendorOrderItemResponse"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/dto.VendorPaginationDTO"
+                }
+            }
+        },
+        "dto.VendorOrderSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "active_reservations_count": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "date": {
+                    "type": "string",
+                    "example": "2026-10-19"
+                },
+                "delivered_packages_count": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total_reserved_packages": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "total_revenue": {
+                    "type": "integer",
+                    "example": 120000
+                }
+            }
+        },
+        "dto.VendorPackageDTO": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "pkg_501"
+                },
+                "image_url": {
+                    "type": "string",
+                    "example": "https://example.com/bread.jpg"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "بستهٔ غافلگیری نانوایی"
+                }
+            }
+        },
+        "dto.VendorPaginationDTO": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "total_items": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "total_pages": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
         "dto.VendorResponse": {
             "type": "object",
             "properties": {
@@ -3144,6 +3704,44 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.VendorStoreActiveResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "example": "تهران، خیابان ولیعصر، پلاک ۱۲"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "is_active": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "name": {
+                    "type": "string",
+                    "example": "نانوایی سنتی شمیران"
+                },
+                "phone": {
+                    "type": "string",
+                    "example": "+982122334455"
+                }
+            }
+        },
+        "dto.VendorTimeSlotDTO": {
+            "type": "object",
+            "properties": {
+                "end_time": {
+                    "type": "string",
+                    "example": "19:00"
+                },
+                "start_time": {
+                    "type": "string",
+                    "example": "18:00"
+                }
+            }
+        },
         "dto.VerifyOTPRequest": {
             "type": "object",
             "properties": {
@@ -3181,6 +3779,40 @@ const docTemplate = `{
                     "$ref": "#/definitions/dto.AuthUserInfo"
                 },
                 "verified": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "dto.VerifyPickupRequest": {
+            "type": "object",
+            "properties": {
+                "pickup_code": {
+                    "type": "string",
+                    "example": "1234"
+                }
+            }
+        },
+        "dto.VerifyPickupResponse": {
+            "type": "object",
+            "properties": {
+                "delivered_at": {
+                    "type": "string",
+                    "example": "2026-10-19T18:15:00Z"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "تحویل بسته با موفقیت ثبت شد"
+                },
+                "order_id": {
+                    "type": "string",
+                    "example": "ord_12345"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "delivered"
+                },
+                "success": {
                     "type": "boolean",
                     "example": true
                 }

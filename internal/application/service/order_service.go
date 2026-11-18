@@ -11,6 +11,7 @@ import (
 	serviceinterface "github.com/tahedig/too-good-to-go/backend/internal/application/service/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/enum"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/exception"
+	"github.com/tahedig/too-good-to-go/backend/internal/domain/model"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/repository"
 	"github.com/tahedig/too-good-to-go/backend/pkg/security"
 )
@@ -135,4 +136,151 @@ func decodeOrderCursor(s string) (*repository.OrderCursor, bool) {
 		return nil, false
 	}
 	return &repository.OrderCursor{CreatedAt: t, ID: strings.ToLower(id)}, true
+}
+
+func (s *orderService) GetVendorStore(ctx context.Context, vendorUserID string) (*model.VendorStoreActive, error) {
+	if vendorUserID == "" {
+		return nil, exception.NewUnauthorized("authentication required")
+	}
+	store, err := s.orders.GetActiveStoreByVendorUser(ctx, vendorUserID)
+	if err != nil {
+		if appErr, ok := err.(exception.AppError); ok {
+			return nil, appErr
+		}
+		return nil, exception.NewInternalServer(err)
+	}
+	if store == nil {
+		return nil, exception.ErrStoreNotFound
+	}
+	return store, nil
+}
+
+func (s *orderService) ListVendorOrders(ctx context.Context, vendorUserID string, in serviceinterface.VendorOrderListInput) (*serviceinterface.VendorOrderListPage, error) {
+	if vendorUserID == "" {
+		return nil, exception.NewUnauthorized("authentication required")
+	}
+	page := in.Page
+	if page < 1 {
+		page = 1
+	}
+	limit := in.Limit
+	if limit < 1 {
+		limit = DefaultOrderPageSize
+	} else if limit > MaxOrderPageSize {
+		limit = MaxOrderPageSize
+	}
+
+	filter := repository.VendorOrderFilter{
+		Date:   strings.TrimSpace(in.Date),
+		Status: strings.TrimSpace(in.Status),
+		Page:   page,
+		Limit:  limit,
+	}
+
+	orders, total, err := s.orders.ListVendorOrders(ctx, vendorUserID, filter)
+	if err != nil {
+		if appErr, ok := err.(exception.AppError); ok {
+			return nil, appErr
+		}
+		return nil, exception.NewInternalServer(err)
+	}
+
+	totalPages := 0
+	if total > 0 {
+		totalPages = (total + limit - 1) / limit
+	}
+
+	return &serviceinterface.VendorOrderListPage{
+		Orders:     orders,
+		TotalItems: total,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+	}, nil
+}
+
+func (s *orderService) GetVendorOrder(ctx context.Context, vendorUserID string, orderID string) (*model.VendorOrder, error) {
+	if vendorUserID == "" {
+		return nil, exception.NewUnauthorized("authentication required")
+	}
+	orderID = strings.TrimSpace(orderID)
+	if orderID == "" {
+		return nil, exception.NewBadRequest("order id is required", nil)
+	}
+
+	order, err := s.orders.GetVendorOrderByID(ctx, vendorUserID, orderID)
+	if err != nil {
+		if appErr, ok := err.(exception.AppError); ok {
+			return nil, appErr
+		}
+		return nil, exception.NewInternalServer(err)
+	}
+	if order == nil {
+		return nil, exception.ErrOrderNotFound
+	}
+	return order, nil
+}
+
+func (s *orderService) GetVendorOrderSummary(ctx context.Context, vendorUserID string, date string) (*model.VendorOrderSummary, error) {
+	if vendorUserID == "" {
+		return nil, exception.NewUnauthorized("authentication required")
+	}
+	date = strings.TrimSpace(date)
+	if date == "" {
+		date = time.Now().UTC().Format("2006-01-02")
+	}
+
+	summary, err := s.orders.GetVendorOrderSummary(ctx, vendorUserID, date)
+	if err != nil {
+		if appErr, ok := err.(exception.AppError); ok {
+			return nil, appErr
+		}
+		return nil, exception.NewInternalServer(err)
+	}
+	return summary, nil
+}
+
+func (s *orderService) VerifyPickup(ctx context.Context, vendorUserID string, orderID string, pickupCode string) (*model.VerifyPickupResult, error) {
+	if vendorUserID == "" {
+		return nil, exception.NewUnauthorized("authentication required")
+	}
+	orderID = strings.TrimSpace(orderID)
+	if orderID == "" {
+		return nil, exception.NewBadRequest("order id is required", nil)
+	}
+
+	res, err := s.orders.VerifyPickup(ctx, vendorUserID, orderID, strings.TrimSpace(pickupCode))
+	if err != nil {
+		if appErr, ok := err.(exception.AppError); ok {
+			return nil, appErr
+		}
+		return nil, exception.NewInternalServer(err)
+	}
+	return res, nil
+}
+
+func (s *orderService) UpdateVendorOrderStatus(ctx context.Context, vendorUserID string, orderID string, status string, reason string) (*model.VendorOrderStatusUpdateResult, error) {
+	if vendorUserID == "" {
+		return nil, exception.NewUnauthorized("authentication required")
+	}
+	orderID = strings.TrimSpace(orderID)
+	if orderID == "" {
+		return nil, exception.NewBadRequest("order id is required", nil)
+	}
+
+	targetDBStatus, _, ok := enum.ParseVendorTargetStatus(strings.TrimSpace(status))
+	if !ok {
+		return nil, exception.NewBadRequest("invalid target status", []exception.FieldError{
+			{Field: "status", Message: "must be ready_for_pickup, ready, cancelled, or no_show"},
+		})
+	}
+
+	res, err := s.orders.UpdateVendorOrderStatus(ctx, vendorUserID, orderID, targetDBStatus, strings.TrimSpace(reason))
+	if err != nil {
+		if appErr, ok := err.(exception.AppError); ok {
+			return nil, appErr
+		}
+		return nil, exception.NewInternalServer(err)
+	}
+	return res, nil
 }
