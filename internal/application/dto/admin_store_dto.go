@@ -3,18 +3,18 @@ package dto
 import "time"
 
 type AdminStoreDetailResponse struct {
-	ID           string                        `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Name         string                        `json:"name" example:"نان صبحگاهی"`
-	OwnerName    string                        `json:"owner_name" example:"آیدا کریمی"`
-	Category     string                        `json:"category" example:"نانوایی"`
-	Phone        string                        `json:"phone" example:"09125550120"`
-	Biography    string                        `json:"biography" example:"نانوایی سنگک سنتی"`
-	ImageURL     *string                       `json:"image_url,omitempty" example:"https://example.com/store.jpg"`
-	IsActive     bool                          `json:"is_active" example:"true"`
-	VendorStatus string                        `json:"vendor_status" example:"approved"`
-	CreatedAt    time.Time                     `json:"created_at" example:"2026-10-17T08:00:00Z"`
-	Location     AdminStoreLocationResponse    `json:"location"`
-	WorkingHours []AdminStoreWorkingHourDTO    `json:"working_hours"`
+	ID           string                     `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Name         string                     `json:"name" example:"نان صبحگاهی"`
+	OwnerName    string                     `json:"owner_name" example:"آیدا کریمی"`
+	Category     string                     `json:"category" example:"نانوایی"`
+	Phone        string                     `json:"phone" example:"09125550120"`
+	Biography    string                     `json:"biography" example:"نانوایی سنگک سنتی"`
+	ImageURL     *string                    `json:"image_url,omitempty" example:"https://example.com/store.jpg"`
+	IsActive     bool                       `json:"is_active" example:"true"`
+	VendorStatus string                     `json:"vendor_status" example:"approved"`
+	CreatedAt    time.Time                  `json:"created_at" example:"2026-10-17T08:00:00Z"`
+	Location     AdminStoreLocationResponse `json:"location"`
+	WorkingHours []AdminStoreWorkingHourDTO `json:"working_hours"`
 }
 
 type AdminStoreLocationResponse struct {
