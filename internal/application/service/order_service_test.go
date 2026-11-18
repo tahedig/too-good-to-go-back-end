@@ -498,7 +498,6 @@ func TestUpdateVendorOrderStatusAndInventory(t *testing.T) {
 	}
 }
 
-
 func isCode(err error, code string) bool {
 	var appErr exception.AppError
 	return errors.As(err, &appErr) && appErr.Code() == code

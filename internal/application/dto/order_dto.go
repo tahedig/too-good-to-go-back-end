@@ -143,4 +143,3 @@ type UpdateVendorOrderStatusResponse struct {
 	UpdatedAt string `json:"updated_at" example:"2026-10-19T18:00:00Z"`
 	Message   string `json:"message" example:"وضعیت سفارش با موفقیت به‌روزرسانی شد"`
 }
-

@@ -428,4 +428,3 @@ func toVendorOrderItemResponse(o *model.VendorOrder) dto.VendorOrderItemResponse
 		CreatedAt: o.CreatedAt.UTC().Format(time.RFC3339),
 	}
 }
-

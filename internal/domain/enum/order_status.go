@@ -120,4 +120,3 @@ func CanVendorTransition(from, to OrderStatus) bool {
 		return false
 	}
 }
-

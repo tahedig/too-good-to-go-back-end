@@ -284,4 +284,3 @@ func (s *orderService) UpdateVendorOrderStatus(ctx context.Context, vendorUserID
 	}
 	return res, nil
 }
-

@@ -141,7 +141,6 @@ func New(
 		apiV1Vendor.PATCH("/orders/:id/status", h.Order.UpdateVendorOrderStatus)
 	}
 
-
 	if h.Profile != nil {
 		customer := r.Group("/customer")
 		customer.Use(authMW.Authenticate(), authMW.RequireRoles(enum.RoleCustomer))

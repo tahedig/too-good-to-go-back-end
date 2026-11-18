@@ -234,24 +234,24 @@ LIMIT $4 OFFSET $5`
 
 	for rows.Next() {
 		var (
-			numericID      int64
-			publicID       string
-			statusStr      string
-			itemsTotal     int64
-			pickupCode     string
-			completedAt    *time.Time
-			createdAt      time.Time
-			custID         string
-			custName       string
-			custPhone      string
-			offerID        string
-			offerTitle     string
-			offerImage     string
-			quantity       int
-			unitPrice      int64
-			pickupStart    *time.Time
-			pickupEnd      *time.Time
-			count          int
+			numericID   int64
+			publicID    string
+			statusStr   string
+			itemsTotal  int64
+			pickupCode  string
+			completedAt *time.Time
+			createdAt   time.Time
+			custID      string
+			custName    string
+			custPhone   string
+			offerID     string
+			offerTitle  string
+			offerImage  string
+			quantity    int
+			unitPrice   int64
+			pickupStart *time.Time
+			pickupEnd   *time.Time
+			count       int
 		)
 
 		if err := rows.Scan(
@@ -648,4 +648,3 @@ WHERE id = $3`
 		Message:   "وضعیت سفارش با موفقیت به‌روزرسانی شد",
 	}, nil
 }
-

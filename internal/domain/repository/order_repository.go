@@ -57,4 +57,3 @@ type OrderRepository interface {
 	// to targetStatus (ready, cancelled, no_show) and restores offer inventory on cancellation.
 	UpdateVendorOrderStatus(ctx context.Context, vendorUserID string, orderID string, targetStatus enum.OrderStatus, reason string) (*model.VendorOrderStatusUpdateResult, error)
 }
-

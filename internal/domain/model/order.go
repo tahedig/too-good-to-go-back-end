@@ -119,4 +119,3 @@ type VendorStoreActive struct {
 	Phone    string
 	IsActive bool
 }
-

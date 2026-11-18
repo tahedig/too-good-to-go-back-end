@@ -63,7 +63,6 @@ func (r *OrderRepository) AddVendorOrder(vendorUserID string, o model.VendorOrde
 	r.vendorOrders[vendorUserID] = append(r.vendorOrders[vendorUserID], o)
 }
 
-
 // Add stores an order for the buyer with this public user ID.
 func (r *OrderRepository) Add(userID string, o model.Order) {
 	r.mu.Lock()
@@ -291,4 +290,3 @@ func effectiveDBStatus(o *model.VendorOrder) enum.OrderStatus {
 		return enum.OrderStatusPaid
 	}
 }
-
