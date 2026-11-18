@@ -47,3 +47,28 @@ type AdminStoreSubscriptionResponse struct {
 	RemainingDays  int       `json:"remaining_days" example:"3"`
 	UpgradeRequest *string   `json:"upgrade_request,omitempty" example:"حرفه‌ای"`
 }
+
+type AdminOfferResponse struct {
+	ID                string    `json:"id" example:"770e8400-e29b-41d4-a716-446655440000"`
+	StoreID           string    `json:"store_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	StoreName         string    `json:"store_name" example:"نان صبحگاهی"`
+	OwnerName         string    `json:"owner_name" example:"آیدا کریمی"`
+	Category          string    `json:"category" example:"نانوایی"`
+	Title             string    `json:"title" example:"بسته غافلگیری نانوایی"`
+	Description       string    `json:"description" example:"ترکیبی از نان‌های تازه پایان روز"`
+	OfferType         string    `json:"offer_type" example:"surprise_bag"`
+	ImageURL          *string   `json:"image_url,omitempty" example:"https://example.com/offer.jpg"`
+	OriginalPrice     int64     `json:"original_price" example:"115000"`
+	DiscountPrice     int64     `json:"discount_price" example:"40000"`
+	QuantityTotal     int       `json:"quantity_total" example:"5"`
+	QuantityAvailable int       `json:"quantity_available" example:"3"`
+	Status            string    `json:"status" example:"active"`
+	IsActive          bool      `json:"is_active" example:"true"`
+	PickupStart       time.Time `json:"pickup_start" example:"2026-10-18T15:00:00Z"`
+	PickupEnd         time.Time `json:"pickup_end" example:"2026-10-18T19:00:00Z"`
+	CreatedAt         time.Time `json:"created_at" example:"2026-10-18T08:00:00Z"`
+}
+
+type AdminOfferListResponse struct {
+	Items []AdminOfferResponse `json:"items"`
+}

@@ -13,12 +13,14 @@ type AdminStoreRepository struct {
 	mu            sync.RWMutex
 	stores        map[string]*model.AdminStoreDetail
 	subscriptions map[string]*model.AdminStoreSubscription
+	offers        map[string]*model.AdminOffer
 }
 
 func NewAdminStoreRepository() *AdminStoreRepository {
 	return &AdminStoreRepository{
 		stores:        make(map[string]*model.AdminStoreDetail),
 		subscriptions: make(map[string]*model.AdminStoreSubscription),
+		offers:        make(map[string]*model.AdminOffer),
 	}
 }
 
@@ -73,6 +75,56 @@ func (r *AdminStoreRepository) GetStoreSubscription(_ context.Context, storeID s
 		return nil, repository.ErrAdminSubscriptionNotFound
 	}
 	cp := *sub
+	return &cp, nil
+}
+
+func (r *AdminStoreRepository) AddOffer(offer model.AdminOffer) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	cp := offer
+	r.offers[offer.ID] = &cp
+}
+
+func (r *AdminStoreRepository) ListStoreOffers(_ context.Context, storeID string) ([]model.AdminOffer, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if _, ok := r.stores[storeID]; !ok {
+		return nil, repository.ErrAdminStoreNotFound
+	}
+	res := make([]model.AdminOffer, 0)
+	for _, o := range r.offers {
+		if o.StoreID == storeID {
+			res = append(res, *o)
+		}
+	}
+	return res, nil
+}
+
+func (r *AdminStoreRepository) GetOffer(_ context.Context, offerID string) (*model.AdminOffer, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	o, ok := r.offers[offerID]
+	if !ok {
+		return nil, repository.ErrAdminOfferNotFound
+	}
+	cp := *o
+	return &cp, nil
+}
+
+func (r *AdminStoreRepository) UpdateOfferStatus(_ context.Context, offerID string, isActive bool) (*model.AdminOffer, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	o, ok := r.offers[offerID]
+	if !ok {
+		return nil, repository.ErrAdminOfferNotFound
+	}
+	o.IsActive = isActive
+	if isActive {
+		o.Status = "active"
+	} else {
+		o.Status = "cancelled"
+	}
+	cp := *o
 	return &cp, nil
 }
 

@@ -102,6 +102,103 @@ func (h *adminStoreHandler) GetSubscription(c *gin.Context) {
 	})
 }
 
+// ListOffers godoc
+// @Summary      List store offers / surprise bags (admin)
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id  path  string  true  "Store ID"
+// @Success      200 {object} dto.AdminOfferListResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      403 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Router       /admin/stores/{id}/offers [get]
+func (h *adminStoreHandler) ListOffers(c *gin.Context) {
+	offers, err := h.svc.ListStoreOffers(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		abortWithError(c, err)
+		return
+	}
+	items := make([]dto.AdminOfferResponse, 0, len(offers))
+	for i := range offers {
+		items = append(items, toAdminOfferResponse(&offers[i]))
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, dto.AdminOfferListResponse{Items: items})
+}
+
+// GetOffer godoc
+// @Summary      Get offer details (admin)
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        offerId  path  string  true  "Offer ID"
+// @Success      200 {object} dto.AdminOfferResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      403 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Router       /admin/offers/{offerId} [get]
+func (h *adminStoreHandler) GetOffer(c *gin.Context) {
+	offer, err := h.svc.GetOffer(c.Request.Context(), c.Param("offerId"))
+	if err != nil {
+		abortWithError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, toAdminOfferResponse(offer))
+}
+
+// UpdateOfferStatus godoc
+// @Summary      Activate or deactivate an offer (admin)
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        offerId  path  string                        true  "Offer ID"
+// @Param        body     body  dto.UpdateAdminStatusRequest  true  "Status"
+// @Success      200 {object} dto.AdminOfferResponse
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      403 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Router       /admin/offers/{offerId}/status [patch]
+func (h *adminStoreHandler) UpdateOfferStatus(c *gin.Context) {
+	var body dto.UpdateAdminStatusRequest
+	if err := bindJSON(c, &body); err != nil {
+		abortWithError(c, err)
+		return
+	}
+	offer, err := h.svc.UpdateOfferStatus(c.Request.Context(), c.Param("offerId"), body.IsActive)
+	if err != nil {
+		abortWithError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, toAdminOfferResponse(offer))
+}
+
+func toAdminOfferResponse(o *model.AdminOffer) dto.AdminOfferResponse {
+	return dto.AdminOfferResponse{
+		ID:                o.ID,
+		StoreID:           o.StoreID,
+		StoreName:         o.StoreName,
+		OwnerName:         o.OwnerName,
+		Category:          o.Category,
+		Title:             o.Title,
+		Description:       o.Description,
+		OfferType:         o.OfferType,
+		ImageURL:          o.ImageURL,
+		OriginalPrice:     o.OriginalPrice,
+		DiscountPrice:     o.DiscountPrice,
+		QuantityTotal:     o.QuantityTotal,
+		QuantityAvailable: o.QuantityAvailable,
+		Status:            o.Status,
+		IsActive:          o.IsActive,
+		PickupStart:       o.PickupStart,
+		PickupEnd:         o.PickupEnd,
+		CreatedAt:         o.CreatedAt,
+	}
+}
+
 func toAdminStoreDetailResponse(s *model.AdminStoreDetail) dto.AdminStoreDetailResponse {
 	hours := make([]dto.AdminStoreWorkingHourDTO, 0, len(s.WorkingHours))
 	for _, h := range s.WorkingHours {

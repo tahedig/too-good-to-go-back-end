@@ -149,6 +149,9 @@ func New(
 			admin.GET("/stores/:id", h.AdminStore.GetStore)
 			admin.PATCH("/stores/:id/status", h.AdminStore.UpdateStoreStatus)
 			admin.GET("/stores/:id/subscription", h.AdminStore.GetSubscription)
+			admin.GET("/stores/:id/offers", h.AdminStore.ListOffers)
+			admin.GET("/offers/:offerId", h.AdminStore.GetOffer)
+			admin.PATCH("/offers/:offerId/status", h.AdminStore.UpdateOfferStatus)
 		}
 	}
 

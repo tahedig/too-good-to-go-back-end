@@ -49,3 +49,25 @@ type AdminStoreSubscription struct {
 	RemainingDays  int
 	UpgradeRequest *string
 }
+
+// AdminOffer holds product/surprise-bag details for the admin store & offer detail views.
+type AdminOffer struct {
+	ID                string
+	StoreID           string
+	StoreName         string
+	OwnerName         string
+	Category          string
+	Title             string
+	Description       string
+	OfferType         string
+	ImageURL          *string
+	OriginalPrice     int64
+	DiscountPrice     int64
+	QuantityTotal     int
+	QuantityAvailable int
+	Status            string
+	IsActive          bool
+	PickupStart       time.Time
+	PickupEnd         time.Time
+	CreatedAt         time.Time
+}

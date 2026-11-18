@@ -138,3 +138,48 @@ func TestAdminStoreService_Subscription(t *testing.T) {
 		t.Fatalf("unexpected subscription: %+v", sub)
 	}
 }
+
+func TestAdminStoreService_Offers(t *testing.T) {
+	svc, repo := newTestAdminStoreService()
+	seedTestStore(repo)
+	ctx := context.Background()
+
+	offerID := "33333333-3333-4333-8333-333333333333"
+	repo.AddOffer(model.AdminOffer{
+		ID:                offerID,
+		StoreID:           testAdminStoreID,
+		StoreName:         "نان صبحگاهی",
+		OwnerName:         "آیدا کریمی",
+		Category:          "نانوایی",
+		Title:             "بسته غافلگیری نانوایی",
+		Description:       "نان تازه پایان روز",
+		OfferType:         "surprise_bag",
+		OriginalPrice:     115000,
+		DiscountPrice:     40000,
+		QuantityTotal:     5,
+		QuantityAvailable: 3,
+		Status:            "active",
+		IsActive:          true,
+		PickupStart:       time.Date(2026, 10, 18, 15, 0, 0, 0, time.UTC),
+		PickupEnd:         time.Date(2026, 10, 18, 19, 0, 0, 0, time.UTC),
+	})
+
+	offers, err := svc.ListStoreOffers(ctx, testAdminStoreID)
+	if err != nil || len(offers) != 1 {
+		t.Fatalf("ListStoreOffers unexpected: %v, len=%d", err, len(offers))
+	}
+
+	got, err := svc.GetOffer(ctx, offerID)
+	if err != nil || got.DiscountPrice != 40000 {
+		t.Fatalf("GetOffer unexpected: %v, %+v", err, got)
+	}
+
+	inactive := false
+	updated, err := svc.UpdateOfferStatus(ctx, offerID, &inactive)
+	if err != nil || updated.IsActive || updated.Status != "cancelled" {
+		t.Fatalf("UpdateOfferStatus unexpected: %v, %+v", err, updated)
+	}
+
+	_, err = svc.UpdateOfferStatus(ctx, offerID, nil)
+	assertAppErrCode(t, err, exception.CodeBadRequest)
+}

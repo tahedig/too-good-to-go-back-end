@@ -198,3 +198,64 @@ func TestAdminStore_GetSubscription(t *testing.T) {
 		t.Fatalf("unexpected subscription response: %+v", got)
 	}
 }
+
+func TestAdminStore_Offers(t *testing.T) {
+	env := newAdminStoreEnv(t)
+	env.seedStore()
+
+	offerID := "33333333-3333-4333-8333-333333333333"
+	env.repo.AddOffer(model.AdminOffer{
+		ID:                offerID,
+		StoreID:           adminStoreTestID,
+		StoreName:         "نان صبحگاهی",
+		OwnerName:         "آیدا کریمی",
+		Category:          "نانوایی",
+		Title:             "بسته غافلگیری نانوایی",
+		Description:       "نان تازه پایان روز",
+		OfferType:         "surprise_bag",
+		OriginalPrice:     115000,
+		DiscountPrice:     40000,
+		QuantityTotal:     5,
+		QuantityAvailable: 3,
+		Status:            "active",
+		IsActive:          true,
+		PickupStart:       time.Date(2026, 10, 18, 15, 0, 0, 0, time.UTC),
+		PickupEnd:         time.Date(2026, 10, 18, 19, 0, 0, 0, time.UTC),
+	})
+
+	// List store offers
+	req := httptest.NewRequest(http.MethodGet, "/admin/stores/"+adminStoreTestID+"/offers", nil)
+	req.Header.Set("Authorization", "Bearer "+env.tokens["admin"])
+	rec := httptest.NewRecorder()
+	env.r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var list dto.AdminOfferListResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil || len(list.Items) != 1 {
+		t.Fatalf("unexpected offer list: err=%v, %+v", err, list)
+	}
+
+	// Get offer detail
+	req = httptest.NewRequest(http.MethodGet, "/admin/offers/"+offerID, nil)
+	req.Header.Set("Authorization", "Bearer "+env.tokens["admin"])
+	rec = httptest.NewRecorder()
+	env.r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	// Deactivate offer
+	req = httptest.NewRequest(http.MethodPatch, "/admin/offers/"+offerID+"/status", bytes.NewBufferString(`{"is_active":false}`))
+	req.Header.Set("Authorization", "Bearer "+env.tokens["admin"])
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	env.r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var updated dto.AdminOfferResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &updated); err != nil || updated.IsActive {
+		t.Fatalf("expected is_active=false, got err=%v, %+v", err, updated)
+	}
+}
