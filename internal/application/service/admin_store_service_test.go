@@ -183,3 +183,41 @@ func TestAdminStoreService_Offers(t *testing.T) {
 	_, err = svc.UpdateOfferStatus(ctx, offerID, nil)
 	assertAppErrCode(t, err, exception.CodeBadRequest)
 }
+
+func TestAdminStoreService_Orders(t *testing.T) {
+	svc, repo := newTestAdminStoreService()
+	seedTestStore(repo)
+	ctx := context.Background()
+
+	repo.AddOrder(model.AdminStoreOrder{
+		ID:           "44444444-4444-4444-8444-444444444441",
+		StoreID:      testAdminStoreID,
+		CustomerName: "لیلا علیزاده",
+		Quantity:     1,
+		TotalAmount:  40000,
+		Status:       "paid",
+		CreatedAt:    time.Date(2026, 10, 18, 10, 0, 0, 0, time.UTC),
+	})
+	repo.AddOrder(model.AdminStoreOrder{
+		ID:           "44444444-4444-4444-8444-444444444442",
+		StoreID:      testAdminStoreID,
+		CustomerName: "نگار محمدی",
+		Quantity:     2,
+		TotalAmount:  80000,
+		Status:       "completed",
+		CreatedAt:    time.Date(2026, 10, 18, 9, 0, 0, 0, time.UTC),
+	})
+
+	activePage, err := svc.ListStoreOrders(ctx, testAdminStoreID, serviceinterface.AdminStoreOrderListInput{Status: "active"})
+	if err != nil || activePage.Total != 1 || len(activePage.Items) != 1 {
+		t.Fatalf("expected 1 active order, got err=%v, %+v", err, activePage)
+	}
+
+	allPage, err := svc.ListStoreOrders(ctx, testAdminStoreID, serviceinterface.AdminStoreOrderListInput{})
+	if err != nil || allPage.Total != 2 {
+		t.Fatalf("expected 2 total orders, got err=%v, %+v", err, allPage)
+	}
+
+	_, err = svc.ListStoreOrders(ctx, testAdminStoreID, serviceinterface.AdminStoreOrderListInput{Status: "invalid_status"})
+	assertAppErrCode(t, err, exception.CodeBadRequest)
+}

@@ -199,6 +199,53 @@ func toAdminOfferResponse(o *model.AdminOffer) dto.AdminOfferResponse {
 	}
 }
 
+// ListOrders godoc
+// @Summary      List store orders (admin)
+// @Description  Lists orders for a store, optionally filtered by status (use "active" for pending_payment, paid, ready).
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id         path   string  true   "Store ID"
+// @Param        status     query  string  false  "active, or comma-separated order statuses"
+// @Param        page       query  int     false  "1-based page (default 1)"
+// @Param        page_size  query  int     false  "1-100 (default 20)"
+// @Success      200 {object} dto.AdminStoreOrderListResponse
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      403 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Router       /admin/stores/{id}/orders [get]
+func (h *adminStoreHandler) ListOrders(c *gin.Context) {
+	res, err := h.svc.ListStoreOrders(c.Request.Context(), c.Param("id"), serviceinterface.AdminStoreOrderListInput{
+		Status:   c.Query("status"),
+		Page:     c.Query("page"),
+		PageSize: c.Query("page_size"),
+	})
+	if err != nil {
+		abortWithError(c, err)
+		return
+	}
+	items := make([]dto.AdminStoreOrderResponse, 0, len(res.Items))
+	for _, o := range res.Items {
+		items = append(items, dto.AdminStoreOrderResponse{
+			ID:           o.ID,
+			StoreID:      o.StoreID,
+			CustomerName: o.CustomerName,
+			Quantity:     o.Quantity,
+			TotalAmount:  o.TotalAmount,
+			Status:       o.Status,
+			CreatedAt:    o.CreatedAt,
+		})
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, dto.AdminStoreOrderListResponse{
+		Items:    items,
+		Total:    res.Total,
+		Page:     res.Page,
+		PageSize: res.PageSize,
+	})
+}
+
 func toAdminStoreDetailResponse(s *model.AdminStoreDetail) dto.AdminStoreDetailResponse {
 	hours := make([]dto.AdminStoreWorkingHourDTO, 0, len(s.WorkingHours))
 	for _, h := range s.WorkingHours {

@@ -9,4 +9,5 @@ type AdminStoreHandler interface {
 	ListOffers(c *gin.Context)
 	GetOffer(c *gin.Context)
 	UpdateOfferStatus(c *gin.Context)
+	ListOrders(c *gin.Context)
 }

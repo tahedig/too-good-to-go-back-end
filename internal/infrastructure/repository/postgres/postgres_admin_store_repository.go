@@ -235,3 +235,69 @@ WHERE o.store_id = s.id AND o.public_id = $1::uuid AND s.deleted_at IS NULL`, of
 	}
 	return r.GetOffer(ctx, offerID)
 }
+
+func (r *adminStoreRepository) ListStoreOrders(ctx context.Context, storeID string, q repository.AdminStoreOrderQuery) (*repository.AdminStoreOrderPage, error) {
+	var exists bool
+	if err := r.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM stores WHERE public_id = $1::uuid AND deleted_at IS NULL)`, storeID).Scan(&exists); err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, repository.ErrAdminStoreNotFound
+	}
+
+	var statuses []string
+	if len(q.Statuses) > 0 {
+		statuses = q.Statuses
+	}
+
+	var total int
+	err := r.pool.QueryRow(ctx, `
+SELECT count(*)
+FROM orders o
+JOIN stores s ON s.id = o.store_id
+WHERE s.public_id = $1::uuid AND s.deleted_at IS NULL
+  AND ($2::text[] IS NULL OR o.status::text = ANY($2::text[]))`, storeID, statuses).Scan(&total)
+	if err != nil {
+		return nil, err
+	}
+
+	offset := (q.Page - 1) * q.PageSize
+	rows, err := r.pool.Query(ctx, `
+SELECT o.public_id::text, s.public_id::text, coalesce(nullif(u.full_name, ''), u.phone, ''),
+       coalesce(sum(oi.quantity), 0)::int, o.total_amount, o.status::text, o.created_at
+FROM orders o
+JOIN stores s ON s.id = o.store_id
+JOIN users u ON u.id = o.user_id
+LEFT JOIN order_items oi ON oi.order_id = o.id
+WHERE s.public_id = $1::uuid AND s.deleted_at IS NULL
+  AND ($2::text[] IS NULL OR o.status::text = ANY($2::text[]))
+GROUP BY o.id, o.public_id, s.public_id, u.full_name, u.phone, o.total_amount, o.status, o.created_at
+ORDER BY o.created_at DESC, o.id DESC
+LIMIT $3 OFFSET $4`, storeID, statuses, q.PageSize, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.AdminStoreOrder, 0)
+	for rows.Next() {
+		var item model.AdminStoreOrder
+		if err := rows.Scan(
+			&item.ID, &item.StoreID, &item.CustomerName,
+			&item.Quantity, &item.TotalAmount, &item.Status, &item.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return &repository.AdminStoreOrderPage{
+		Items:    items,
+		Total:    total,
+		Page:     q.Page,
+		PageSize: q.PageSize,
+	}, nil
+}

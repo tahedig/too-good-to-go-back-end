@@ -152,6 +152,7 @@ func New(
 			admin.GET("/stores/:id/offers", h.AdminStore.ListOffers)
 			admin.GET("/offers/:offerId", h.AdminStore.GetOffer)
 			admin.PATCH("/offers/:offerId/status", h.AdminStore.UpdateOfferStatus)
+			admin.GET("/stores/:id/orders", h.AdminStore.ListOrders)
 		}
 	}
 

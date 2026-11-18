@@ -2,6 +2,8 @@ package memory
 
 import (
 	"context"
+	"slices"
+	"sort"
 	"sync"
 
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/model"
@@ -14,6 +16,7 @@ type AdminStoreRepository struct {
 	stores        map[string]*model.AdminStoreDetail
 	subscriptions map[string]*model.AdminStoreSubscription
 	offers        map[string]*model.AdminOffer
+	orders        map[string][]model.AdminStoreOrder
 }
 
 func NewAdminStoreRepository() *AdminStoreRepository {
@@ -21,6 +24,7 @@ func NewAdminStoreRepository() *AdminStoreRepository {
 		stores:        make(map[string]*model.AdminStoreDetail),
 		subscriptions: make(map[string]*model.AdminStoreSubscription),
 		offers:        make(map[string]*model.AdminOffer),
+		orders:        make(map[string][]model.AdminStoreOrder),
 	}
 }
 
@@ -126,6 +130,46 @@ func (r *AdminStoreRepository) UpdateOfferStatus(_ context.Context, offerID stri
 	}
 	cp := *o
 	return &cp, nil
+}
+
+func (r *AdminStoreRepository) AddOrder(order model.AdminStoreOrder) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.orders[order.StoreID] = append(r.orders[order.StoreID], order)
+}
+
+func (r *AdminStoreRepository) ListStoreOrders(_ context.Context, storeID string, q repository.AdminStoreOrderQuery) (*repository.AdminStoreOrderPage, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if _, ok := r.stores[storeID]; !ok {
+		return nil, repository.ErrAdminStoreNotFound
+	}
+	filtered := make([]model.AdminStoreOrder, 0)
+	for _, o := range r.orders[storeID] {
+		if len(q.Statuses) > 0 && !slices.Contains(q.Statuses, o.Status) {
+			continue
+		}
+		filtered = append(filtered, o)
+	}
+	sort.Slice(filtered, func(i, j int) bool {
+		return filtered[i].CreatedAt.After(filtered[j].CreatedAt)
+	})
+
+	total := len(filtered)
+	start := (q.Page - 1) * q.PageSize
+	if start > total {
+		start = total
+	}
+	end := start + q.PageSize
+	if end > total {
+		end = total
+	}
+	return &repository.AdminStoreOrderPage{
+		Items:    filtered[start:end],
+		Total:    total,
+		Page:     q.Page,
+		PageSize: q.PageSize,
+	}, nil
 }
 
 func cloneAdminStore(s model.AdminStoreDetail) model.AdminStoreDetail {

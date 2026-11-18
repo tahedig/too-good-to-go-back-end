@@ -1,5 +1,211 @@
 basePath: /
 definitions:
+  dto.AdminOfferListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/dto.AdminOfferResponse'
+        type: array
+    type: object
+  dto.AdminOfferResponse:
+    properties:
+      category:
+        example: نانوایی
+        type: string
+      created_at:
+        example: "2026-10-18T08:00:00Z"
+        type: string
+      description:
+        example: ترکیبی از نان‌های تازه پایان روز
+        type: string
+      discount_price:
+        example: 40000
+        type: integer
+      id:
+        example: 770e8400-e29b-41d4-a716-446655440000
+        type: string
+      image_url:
+        example: https://example.com/offer.jpg
+        type: string
+      is_active:
+        example: true
+        type: boolean
+      offer_type:
+        example: surprise_bag
+        type: string
+      original_price:
+        example: 115000
+        type: integer
+      owner_name:
+        example: آیدا کریمی
+        type: string
+      pickup_end:
+        example: "2026-10-18T19:00:00Z"
+        type: string
+      pickup_start:
+        example: "2026-10-18T15:00:00Z"
+        type: string
+      quantity_available:
+        example: 3
+        type: integer
+      quantity_total:
+        example: 5
+        type: integer
+      status:
+        example: active
+        type: string
+      store_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      store_name:
+        example: نان صبحگاهی
+        type: string
+      title:
+        example: بسته غافلگیری نانوایی
+        type: string
+    type: object
+  dto.AdminStoreDetailResponse:
+    properties:
+      biography:
+        example: نانوایی سنگک سنتی
+        type: string
+      category:
+        example: نانوایی
+        type: string
+      created_at:
+        example: "2026-10-17T08:00:00Z"
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      image_url:
+        example: https://example.com/store.jpg
+        type: string
+      is_active:
+        example: true
+        type: boolean
+      location:
+        $ref: '#/definitions/dto.AdminStoreLocationResponse'
+      name:
+        example: نان صبحگاهی
+        type: string
+      owner_name:
+        example: آیدا کریمی
+        type: string
+      phone:
+        example: "09125550120"
+        type: string
+      vendor_status:
+        example: approved
+        type: string
+      working_hours:
+        items:
+          $ref: '#/definitions/dto.AdminStoreWorkingHourDTO'
+        type: array
+    type: object
+  dto.AdminStoreLocationResponse:
+    properties:
+      address_line:
+        example: خیابان ولیعصر، پلاک ۱۲
+        type: string
+      city:
+        example: تهران
+        type: string
+      district:
+        example: ولیعصر
+        type: string
+      latitude:
+        example: 35.7219
+        type: number
+      longitude:
+        example: 51.3347
+        type: number
+    type: object
+  dto.AdminStoreOrderListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/dto.AdminStoreOrderResponse'
+        type: array
+      page:
+        example: 1
+        type: integer
+      page_size:
+        example: 20
+        type: integer
+      total:
+        example: 3
+        type: integer
+    type: object
+  dto.AdminStoreOrderResponse:
+    properties:
+      created_at:
+        example: "2026-10-18T10:30:00Z"
+        type: string
+      customer_name:
+        example: لیلا علیزاده
+        type: string
+      id:
+        example: 880e8400-e29b-41d4-a716-446655440000
+        type: string
+      quantity:
+        example: 1
+        type: integer
+      status:
+        example: paid
+        type: string
+      store_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      total_amount:
+        example: 40000
+        type: integer
+    type: object
+  dto.AdminStoreSubscriptionResponse:
+    properties:
+      commission_rate:
+        example: 10
+        type: number
+      current_plan:
+        example: پایه - رایگان
+        type: string
+      id:
+        example: 660e8400-e29b-41d4-a716-446655440000
+        type: string
+      period_end:
+        example: "2026-10-22T23:59:59Z"
+        type: string
+      period_start:
+        example: "2026-09-23T00:00:00Z"
+        type: string
+      remaining_days:
+        example: 3
+        type: integer
+      status:
+        example: pending_review
+        type: string
+      store_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      upgrade_request:
+        example: حرفه‌ای
+        type: string
+    type: object
+  dto.AdminStoreWorkingHourDTO:
+    properties:
+      close_time:
+        example: "19:00"
+        type: string
+      day_of_week:
+        example: 0
+        type: integer
+      is_closed:
+        example: false
+        type: boolean
+      open_time:
+        example: "08:00"
+        type: string
+    type: object
   dto.AuthUserInfo:
     properties:
       id:
@@ -634,6 +840,12 @@ definitions:
         example: شنبه تا چهارشنبه · ۰۸:۰۰ تا ۱۹:۰۰
         type: string
     type: object
+  dto.UpdateAdminStatusRequest:
+    properties:
+      is_active:
+        example: false
+        type: boolean
+    type: object
   dto.UpdateProfileRequest:
     properties:
       display_name:
@@ -837,6 +1049,277 @@ info:
   title: Too Good To Go API
   version: "1.0"
 paths:
+  /admin/offers/{offerId}:
+    get:
+      parameters:
+      - description: Offer ID
+        in: path
+        name: offerId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AdminOfferResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get offer details (admin)
+      tags:
+      - admin
+  /admin/offers/{offerId}/status:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Offer ID
+        in: path
+        name: offerId
+        required: true
+        type: string
+      - description: Status
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateAdminStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AdminOfferResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Activate or deactivate an offer (admin)
+      tags:
+      - admin
+  /admin/stores/{id}:
+    get:
+      description: Returns store info, working hours, and location for the admin store
+        details page.
+      parameters:
+      - description: Store ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AdminStoreDetailResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get full store details (admin)
+      tags:
+      - admin
+  /admin/stores/{id}/offers:
+    get:
+      parameters:
+      - description: Store ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AdminOfferListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List store offers / surprise bags (admin)
+      tags:
+      - admin
+  /admin/stores/{id}/orders:
+    get:
+      description: Lists orders for a store, optionally filtered by status (use "active"
+        for pending_payment, paid, ready).
+      parameters:
+      - description: Store ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: active, or comma-separated order statuses
+        in: query
+        name: status
+        type: string
+      - description: 1-based page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: 1-100 (default 20)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AdminStoreOrderListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List store orders (admin)
+      tags:
+      - admin
+  /admin/stores/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      description: Toggles whether a store is active and accepting orders.
+      parameters:
+      - description: Store ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Status
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateAdminStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AdminStoreDetailResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Activate or deactivate a store (admin)
+      tags:
+      - admin
+  /admin/stores/{id}/subscription:
+    get:
+      description: Returns the store's current subscription plan, commission rate,
+        period, remaining days, and upgrade request.
+      parameters:
+      - description: Store ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AdminStoreSubscriptionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get store seller subscription (admin)
+      tags:
+      - admin
   /admin/vendors:
     get:
       description: Stores newest submitted first, with filters and page-number pagination.

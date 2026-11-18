@@ -71,3 +71,14 @@ type AdminOffer struct {
 	PickupEnd         time.Time
 	CreatedAt         time.Time
 }
+
+// AdminStoreOrder holds an order summary for the admin store active-orders card and list.
+type AdminStoreOrder struct {
+	ID           string
+	StoreID      string
+	CustomerName string
+	Quantity     int
+	TotalAmount  int64
+	Status       string
+	CreatedAt    time.Time
+}

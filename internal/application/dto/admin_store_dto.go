@@ -72,3 +72,20 @@ type AdminOfferResponse struct {
 type AdminOfferListResponse struct {
 	Items []AdminOfferResponse `json:"items"`
 }
+
+type AdminStoreOrderResponse struct {
+	ID           string    `json:"id" example:"880e8400-e29b-41d4-a716-446655440000"`
+	StoreID      string    `json:"store_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	CustomerName string    `json:"customer_name" example:"لیلا علیزاده"`
+	Quantity     int       `json:"quantity" example:"1"`
+	TotalAmount  int64     `json:"total_amount" example:"40000"`
+	Status       string    `json:"status" example:"paid"`
+	CreatedAt    time.Time `json:"created_at" example:"2026-10-18T10:30:00Z"`
+}
+
+type AdminStoreOrderListResponse struct {
+	Items    []AdminStoreOrderResponse `json:"items"`
+	Total    int                       `json:"total" example:"3"`
+	Page     int                       `json:"page" example:"1"`
+	PageSize int                       `json:"page_size" example:"20"`
+}

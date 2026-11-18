@@ -259,3 +259,43 @@ func TestAdminStore_Offers(t *testing.T) {
 		t.Fatalf("expected is_active=false, got err=%v, %+v", err, updated)
 	}
 }
+
+func TestAdminStore_Orders(t *testing.T) {
+	env := newAdminStoreEnv(t)
+	env.seedStore()
+
+	env.repo.AddOrder(model.AdminStoreOrder{
+		ID:           "44444444-4444-4444-8444-444444444441",
+		StoreID:      adminStoreTestID,
+		CustomerName: "لیلا علیزاده",
+		Quantity:     1,
+		TotalAmount:  40000,
+		Status:       "paid",
+		CreatedAt:    time.Date(2026, 10, 18, 10, 0, 0, 0, time.UTC),
+	})
+	env.repo.AddOrder(model.AdminStoreOrder{
+		ID:           "44444444-4444-4444-8444-444444444442",
+		StoreID:      adminStoreTestID,
+		CustomerName: "نگار محمدی",
+		Quantity:     2,
+		TotalAmount:  80000,
+		Status:       "completed",
+		CreatedAt:    time.Date(2026, 10, 18, 9, 0, 0, 0, time.UTC),
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/stores/"+adminStoreTestID+"/orders?status=active", nil)
+	req.Header.Set("Authorization", "Bearer "+env.tokens["admin"])
+	rec := httptest.NewRecorder()
+	env.r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var got dto.AdminStoreOrderListResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || got.Total != 1 || len(got.Items) != 1 {
+		t.Fatalf("unexpected orders response: err=%v, %+v", err, got)
+	}
+	if got.Items[0].CustomerName != "لیلا علیزاده" || got.Items[0].TotalAmount != 40000 {
+		t.Fatalf("unexpected order item: %+v", got.Items[0])
+	}
+}

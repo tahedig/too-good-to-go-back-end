@@ -13,6 +13,20 @@ var (
 	ErrAdminOfferNotFound        = errors.New("admin offer not found")
 )
 
+// AdminStoreOrderQuery filters and paginates a store's orders.
+type AdminStoreOrderQuery struct {
+	Statuses []string
+	Page     int
+	PageSize int
+}
+
+type AdminStoreOrderPage struct {
+	Items    []model.AdminStoreOrder
+	Total    int
+	Page     int
+	PageSize int
+}
+
 // AdminStoreRepository provides admin-level read and status operations for stores.
 type AdminStoreRepository interface {
 	GetStore(ctx context.Context, storeID string) (*model.AdminStoreDetail, error)
@@ -21,4 +35,5 @@ type AdminStoreRepository interface {
 	ListStoreOffers(ctx context.Context, storeID string) ([]model.AdminOffer, error)
 	GetOffer(ctx context.Context, offerID string) (*model.AdminOffer, error)
 	UpdateOfferStatus(ctx context.Context, offerID string, isActive bool) (*model.AdminOffer, error)
+	ListStoreOrders(ctx context.Context, storeID string, q AdminStoreOrderQuery) (*AdminStoreOrderPage, error)
 }
