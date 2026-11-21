@@ -1,5 +1,124 @@
 basePath: /
 definitions:
+  dto.AdminActivityItemResponse:
+    properties:
+      action:
+        example: approve
+        type: string
+      actor_name:
+        example: آیدا کریمی
+        type: string
+      amount:
+        example: 40000
+        type: integer
+      entity_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      occurred_at:
+        example: "2026-10-19T07:10:00Z"
+        type: string
+      status:
+        example: pending
+        type: string
+      title:
+        example: نان صبحگاهی · شعبه شریعتی
+        type: string
+      type:
+        description: 'Type: store_application, store_decision, or reservation.'
+        example: store_application
+        type: string
+    type: object
+  dto.AdminApplicationBreakdownResponse:
+    properties:
+      approved:
+        example: 1
+        type: integer
+      pending:
+        example: 3
+        type: integer
+      rejected:
+        example: 1
+        type: integer
+      suspended:
+        example: 0
+        type: integer
+    type: object
+  dto.AdminDashboardResponse:
+    properties:
+      applications:
+        $ref: '#/definitions/dto.AdminApplicationBreakdownResponse'
+      recent_activity:
+        items:
+          $ref: '#/definitions/dto.AdminActivityItemResponse'
+        type: array
+      reservations:
+        $ref: '#/definitions/dto.AdminReservationBreakdownResponse'
+      totals:
+        $ref: '#/definitions/dto.AdminDashboardTotalsResponse'
+    type: object
+  dto.AdminDashboardTotalsResponse:
+    properties:
+      active_offers:
+        example: 1
+        type: integer
+      active_reservations:
+        example: 2
+        type: integer
+      active_stores:
+        example: 1
+        type: integer
+      completed_reservations:
+        example: 0
+        type: integer
+      customers:
+        example: 2
+        type: integer
+      pending_applications:
+        example: 3
+        type: integer
+      platform_commission:
+        example: 200000
+        type: integer
+      registered_stores:
+        example: 5
+        type: integer
+      total_reservations:
+        example: 2
+        type: integer
+      vendors:
+        example: 4
+        type: integer
+    type: object
+  dto.AdminReservationBreakdownResponse:
+    properties:
+      active:
+        example: 2
+        type: integer
+      cancelled:
+        example: 0
+        type: integer
+      completed:
+        example: 0
+        type: integer
+      expired:
+        example: 0
+        type: integer
+      no_show:
+        example: 0
+        type: integer
+      paid:
+        example: 2
+        type: integer
+      pending_payment:
+        example: 0
+        type: integer
+      ready:
+        example: 0
+        type: integer
+      total:
+        example: 2
+        type: integer
+    type: object
   dto.AuthUserInfo:
     properties:
       id:
@@ -837,6 +956,48 @@ info:
   title: Too Good To Go API
   version: "1.0"
 paths:
+  /admin/dashboard:
+    get:
+      description: Returns admin-only platform totals for customers, vendors, stores,
+        active offers, reservations, platform commission, application status breakdown,
+        reservation status breakdown, and a concise recent-activity feed.
+      parameters:
+      - description: Maximum number of recent-activity items, 1-50 (default 10)
+        in: query
+        name: activity_limit
+        type: integer
+      - description: 'Comma-separated filter: store_application, store_decision, reservation'
+        in: query
+        name: activity_type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AdminDashboardResponse'
+        "400":
+          description: 'BAD_REQUEST: invalid activity_limit or activity_type'
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: 'FORBIDDEN: not an admin'
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Admin dashboard summary
+      tags:
+      - admin
   /admin/vendors:
     get:
       description: Stores newest submitted first, with filters and page-number pagination.

@@ -52,7 +52,10 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 	vendorApprovalRepository := provideVendorApprovalRepository(injectorDatabase)
 	vendorApprovalService := service.NewVendorApprovalService(vendorApprovalRepository, log)
 	vendorApprovalHandler := handler.NewVendorApprovalHandler(vendorApprovalService)
-	handlers := provideHandlers(healthHandler, authHandler, catalogueHandler, userAuth, protectedHandler, profileHandler, orderHandler, vendorApprovalHandler)
+	adminDashboardRepository := provideAdminDashboardRepository(injectorDatabase)
+	adminDashboardService := service.NewAdminDashboardService(adminDashboardRepository)
+	adminDashboardHandler := handler.NewAdminDashboardHandler(adminDashboardService)
+	handlers := provideHandlers(healthHandler, authHandler, catalogueHandler, userAuth, protectedHandler, profileHandler, orderHandler, vendorApprovalHandler, adminDashboardHandler)
 	engine, err := router.New(cfg, log, errorHandler, authMiddleware, rateLimiter, handlers)
 	if err != nil {
 		cleanup2()

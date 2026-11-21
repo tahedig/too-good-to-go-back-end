@@ -345,6 +345,18 @@ here is a store; `stores.status` is the only status there is.
 Browsers on other origins (the admin panel) need `CORS_ALLOWED_ORIGINS`; in
 development it defaults to `http://localhost:5173`.
 
+## Admin dashboard
+
+`GET /admin/dashboard` returns an admin-only platform summary (`admin` role only: `401` without a valid token, `403` for any other role).
+
+| Query | Meaning |
+|---|---|
+| `activity_limit` | Maximum recent-activity items returned, 1-50 (default 10) |
+| `activity_type` | Optional comma-separated filter: `store_application`, `store_decision`, `reservation` |
+
+- Returns `totals` (`customers`, `vendors`, `registered_stores`, `active_stores`, `active_offers`, `pending_applications`, `total_reservations`, `active_reservations`, `completed_reservations`, `platform_commission`), `applications` (counts per `store_status`), `reservations` (counts per `order_status` plus `active` and `total`), and `recent_activity` (newest first).
+- All queries run inside a single read-only `RepeatableRead` snapshot in PostgreSQL, with `Cache-Control: no-store`. Amounts are in Toman and timestamps are UTC.
+
 ## Error response format
 
 Every error from every endpoint (including 404, 405 and recovered panics) has
