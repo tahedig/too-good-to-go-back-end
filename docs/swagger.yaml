@@ -685,6 +685,150 @@ definitions:
         example: 2
         type: integer
     type: object
+  dto.VendorDashboardFinancialResponse:
+    properties:
+      available_balance:
+        example: 300000
+        type: integer
+      net_period_revenue:
+        example: 1800000
+        type: integer
+      pending_payout:
+        example: 500000
+        type: integer
+      plan:
+        $ref: '#/definitions/dto.VendorDashboardPlanResponse'
+      received_payout:
+        example: 1000000
+        type: integer
+    type: object
+  dto.VendorDashboardKPIsResponse:
+    properties:
+      active_offers:
+        example: 1
+        type: integer
+      available_packages:
+        example: 3
+        type: integer
+      received_revenue:
+        example: 1000000
+        type: integer
+      reserved_packages:
+        example: 3
+        type: integer
+    type: object
+  dto.VendorDashboardPlanResponse:
+    properties:
+      commission_rate:
+        example: 10
+        type: number
+      name:
+        example: پایه · رایگان
+        type: string
+      period_end:
+        example: "2026-11-01T00:00:00Z"
+        type: string
+      period_start:
+        example: "2026-10-01T00:00:00Z"
+        type: string
+      remaining_days:
+        example: 12
+        type: integer
+    type: object
+  dto.VendorDashboardReservationSummary:
+    properties:
+      created_at:
+        example: "2026-10-19T10:00:00Z"
+        type: string
+      customer_name:
+        example: لیلا علیزاده
+        type: string
+      id:
+        example: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/dto.OrderItemResponse'
+        type: array
+      items_total:
+        example: 40000
+        type: integer
+      payment_status:
+        example: succeeded
+        type: string
+      pickup_code:
+        example: "4821"
+        type: string
+      pickup_end:
+        example: "2026-10-19T15:30:00Z"
+        type: string
+      pickup_start:
+        example: "2026-10-19T14:30:00Z"
+        type: string
+      status:
+        example: paid
+        type: string
+      store_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      store_name:
+        example: نان صبحگاهی
+        type: string
+      total_amount:
+        example: 40000
+        type: integer
+      vendor_payout:
+        example: 36000
+        type: integer
+    type: object
+  dto.VendorDashboardResponse:
+    properties:
+      active_store:
+        $ref: '#/definitions/dto.VendorDashboardStoreResponse'
+      financial:
+        $ref: '#/definitions/dto.VendorDashboardFinancialResponse'
+      kpis:
+        $ref: '#/definitions/dto.VendorDashboardKPIsResponse'
+      nearest_reservation:
+        $ref: '#/definitions/dto.VendorNearestReservationResponse'
+      pending_store_requests:
+        items:
+          $ref: '#/definitions/dto.VendorPendingStoreBannerResponse'
+        type: array
+      recent_reservations:
+        items:
+          $ref: '#/definitions/dto.VendorDashboardReservationSummary'
+        type: array
+      reservation_counts:
+        $ref: '#/definitions/dto.VendorReservationCountsResponse'
+      stores:
+        items:
+          $ref: '#/definitions/dto.VendorDashboardStoreResponse'
+        type: array
+      today:
+        $ref: '#/definitions/dto.VendorTodayActivityResponse'
+    type: object
+  dto.VendorDashboardStoreResponse:
+    properties:
+      accepts_orders:
+        example: true
+        type: boolean
+      address:
+        example: تهران، خیابان ولیعصر، پلاک ۱۲
+        type: string
+      created_at:
+        example: "2026-10-15T08:00:00Z"
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      name:
+        example: نان صبحگاهی
+        type: string
+      status:
+        example: approved
+        type: string
+    type: object
   dto.VendorDecisionRequest:
     properties:
       message:
@@ -734,6 +878,105 @@ definitions:
         example: 37
         type: integer
     type: object
+  dto.VendorNearestReservationResponse:
+    properties:
+      created_at:
+        example: "2026-10-19T10:00:00Z"
+        type: string
+      customer_name:
+        example: لیلا علیزاده
+        type: string
+      id:
+        example: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+        type: string
+      offer_image_url:
+        example: https://example.com/bag.jpg
+        type: string
+      offer_quantity_available:
+        example: 3
+        type: integer
+      offer_quantity_reserved:
+        example: 3
+        type: integer
+      offer_quantity_total:
+        example: 6
+        type: integer
+      offer_title:
+        example: بسته غافلگیری نانوایی
+        type: string
+      pickup_code:
+        example: "4821"
+        type: string
+      pickup_end:
+        example: "2026-10-19T15:30:00Z"
+        type: string
+      pickup_start:
+        example: "2026-10-19T14:30:00Z"
+        type: string
+      quantity:
+        example: 1
+        type: integer
+      status:
+        example: paid
+        type: string
+      store_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      store_name:
+        example: نان صبحگاهی
+        type: string
+      total_amount:
+        example: 40000
+        type: integer
+    type: object
+  dto.VendorPendingStoreBannerResponse:
+    properties:
+      address:
+        example: تهران، خیابان شریعتی، پلاک ۲۴
+        type: string
+      created_at:
+        example: "2026-10-18T10:30:00Z"
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440001
+        type: string
+      status:
+        example: pending
+        type: string
+      store_name:
+        example: نان صبحگاهی · شعبه شریعتی
+        type: string
+    type: object
+  dto.VendorReservationCountsResponse:
+    properties:
+      active:
+        example: 4
+        type: integer
+      cancelled:
+        example: 1
+        type: integer
+      completed:
+        example: 10
+        type: integer
+      expired:
+        example: 0
+        type: integer
+      no_show:
+        example: 0
+        type: integer
+      paid:
+        example: 2
+        type: integer
+      pending_payment:
+        example: 1
+        type: integer
+      ready:
+        example: 1
+        type: integer
+      total:
+        example: 15
+        type: integer
+    type: object
   dto.VendorResponse:
     properties:
       address:
@@ -778,6 +1021,21 @@ definitions:
       submitted_at:
         example: "2026-10-19T07:10:00Z"
         type: string
+    type: object
+  dto.VendorTodayActivityResponse:
+    properties:
+      completed_count:
+        example: 1
+        type: integer
+      packages_reserved:
+        example: 4
+        type: integer
+      reservations_count:
+        example: 3
+        type: integer
+      revenue:
+        example: 120000
+        type: integer
     type: object
   dto.VerifyOTPRequest:
     properties:
@@ -2003,6 +2261,53 @@ paths:
       summary: Vendor-only test route
       tags:
       - rbac
+  /vendor/dashboard:
+    get:
+      description: Returns dashboard metrics, reservation counts by status, today's
+        activity (Asia/Tehran), financial overview, nearest active reservation, pending
+        store applications, and recent reservations scoped strictly to stores owned
+        by the authenticated vendor.
+      parameters:
+      - description: Optional UUID of an owned store to narrow the summary
+        in: query
+        name: store_id
+        type: string
+      - description: Maximum number of recent reservations, 1-50 (default 10)
+        in: query
+        name: recent_limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VendorDashboardResponse'
+        "400":
+          description: 'BAD_REQUEST: invalid store_id or recent_limit'
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: 'FORBIDDEN: not a vendor'
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: 'NOT_FOUND: store not found or not owned by vendor'
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Vendor dashboard summary
+      tags:
+      - vendor
   /vendor/store-requests:
     get:
       consumes:

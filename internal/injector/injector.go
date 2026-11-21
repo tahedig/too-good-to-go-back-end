@@ -116,11 +116,12 @@ func provideAuthService(
 // database is everything that moves from memory to PostgreSQL when
 // DATABASE_URL is set.
 type database struct {
-	users    repository.UserRepository
-	orders   repository.OrderRepository
-	vendors  repository.VendorApprovalRepository
-	pool     *pgxpool.Pool
-	checkers []serviceinterface.HealthChecker
+	users           repository.UserRepository
+	orders          repository.OrderRepository
+	vendors         repository.VendorApprovalRepository
+	vendorDashboard repository.VendorDashboardRepository
+	pool            *pgxpool.Pool
+	checkers        []serviceinterface.HealthChecker
 }
 
 const dbConnectTimeout = 5 * time.Second
@@ -132,8 +133,12 @@ const dbConnectTimeout = 5 * time.Second
 func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func(), error) {
 	if cfg.DatabaseURL == "" {
 		log.Warn("DATABASE_URL is not set: users and orders are kept in memory, are lost on restart and are not shared between instances")
-		return &database{users: memory.NewUserRepository(), orders: memory.NewOrderRepository(),
-			vendors: memory.NewVendorApprovalRepository()}, func() {}, nil
+		return &database{
+			users:           memory.NewUserRepository(),
+			orders:          memory.NewOrderRepository(),
+			vendors:         memory.NewVendorApprovalRepository(),
+			vendorDashboard: memory.NewVendorDashboardRepository(),
+		}, func() {}, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbConnectTimeout)
@@ -150,9 +155,12 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 	log.Info("connected to postgres", "host", connCfg.Host, "port", connCfg.Port, "database", connCfg.Database)
 
 	return &database{
-		users:    postgres.NewUserRepository(pool),
-		orders:   postgres.NewOrderRepository(pool),
-		checkers: []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
+		users:           postgres.NewUserRepository(pool),
+		orders:          postgres.NewOrderRepository(pool),
+		vendors:         postgres.NewVendorApprovalRepository(pool),
+		vendorDashboard: postgres.NewVendorDashboardRepository(pool),
+		pool:            pool,
+		checkers:        []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
 	}, pool.Close, nil
 }
 
@@ -162,6 +170,10 @@ func provideOrderRepository(db *database) repository.OrderRepository { return db
 
 func provideVendorApprovalRepository(db *database) repository.VendorApprovalRepository {
 	return db.vendors
+}
+
+func provideVendorDashboardRepository(db *database) repository.VendorDashboardRepository {
+	return db.vendorDashboard
 }
 
 // providePhoneRoles maps ADMIN_PHONES / VENDOR_PHONES to the role a new user
@@ -199,15 +211,17 @@ func provideHandlers(
 	profile handlerinterface.ProfileHandler,
 	order handlerinterface.OrderHandler,
 	vendorApproval handlerinterface.VendorApprovalHandler,
+	vendorDashboard handlerinterface.VendorDashboardHandler,
 ) router.Handlers {
 	return router.Handlers{
-		Health:         health,
-		Auth:           auth,
-		Catalogue:      catalogue,
-		UserAuth:       userAuth,
-		Protected:      protected,
-		Profile:        profile,
-		Order:          order,
-		VendorApproval: vendorApproval,
+		Health:          health,
+		Auth:            auth,
+		Catalogue:       catalogue,
+		UserAuth:        userAuth,
+		Protected:       protected,
+		Profile:         profile,
+		Order:           order,
+		VendorApproval:  vendorApproval,
+		VendorDashboard: vendorDashboard,
 	}
 }
