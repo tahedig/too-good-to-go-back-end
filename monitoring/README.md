@@ -32,8 +32,8 @@ This directory contains the production-grade monitoring stack for the staging se
 ## Security Model
 
 1. **Network Isolation**:
-   - Prometheus (`9090`) and Node Exporter (`9100`) are **never published** to the host interface (`expose` only). They communicate strictly over the internal isolated bridge network (`monitoring`).
-   - Grafana is explicitly bound to `127.0.0.1:${GRAFANA_PORT:-3000}`. It cannot be accessed directly from the public internet.
+   - Prometheus (`9090`) and Node Exporter (`9100`) are **never published** to the host interface (`expose` only). They are attached strictly to the `internal: true` bridge network (`monitoring`), blocking external/outbound network access.
+   - Grafana connects to `monitoring` (to query Prometheus) and `ingress` (to publish `127.0.0.1:${GRAFANA_PORT:-3000}:3000`), so it cannot be accessed directly from the public internet.
 2. **Authentication**:
    - Anonymous access is disabled (`GF_AUTH_ANONYMOUS_ENABLED: "false"`).
    - User self-registration is disabled (`GF_USERS_ALLOW_SIGN_UP: "false"`).

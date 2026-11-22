@@ -54,9 +54,13 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - monitoring
+      - ingress
 
 networks:
   monitoring:
+    driver: bridge
+    internal: true
+  ingress:
     driver: bridge
 
 volumes:
