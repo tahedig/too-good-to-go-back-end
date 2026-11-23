@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly TGTG restore drill (restores latest backup into a throw-away DB and verifies it)
+
+[Service]
+Type=oneshot
+User=tgtg-backup
+Group=tgtg-backup
+Environment=DB_BACKUP_ENV=/etc/tgtg/db-backup.env
+ExecStart=/opt/tgtg/scripts/db/restore.sh
+UMask=0077
+NoNewPrivileges=true
