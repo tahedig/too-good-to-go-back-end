@@ -133,10 +133,11 @@ func New(
 		r.GET("/orders", authMW.Authenticate(), h.Order.ListMyOrders)
 	}
 
-	// Customer reservation checkout (TEAM-49).
+	// Customer reservation checkout (TEAM-49) and confirmation (TEAM-51).
 	if h.Reservation != nil {
 		reservations := r.Group("/reservations", authMW.Authenticate())
 		reservations.POST("", h.Reservation.CreateReservation)
+		reservations.GET("/:id", h.Reservation.GetReservation)
 	}
 
 	// Admin only: every /admin route needs a valid token with the admin role.

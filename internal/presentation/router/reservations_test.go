@@ -182,6 +182,70 @@ func TestReservationCheckoutAndIdempotency(t *testing.T) {
 	}
 }
 
+func TestReservationConfirmationAndOwnership(t *testing.T) {
+	e := newReservationsEnv(t)
+	alice := e.login(t, rbacCustomerPhone)
+	bob := e.login(t, "+989123456700")
+	offerID := "7d0c2a3e-1f5b-4a52-8c64-2f4e9b1a0c33"
+	e.seedOffer(offerID, 3, 2)
+
+	// Create reservation as Alice
+	req := httptest.NewRequest(http.MethodPost, "/reservations", bytes.NewBufferString(`{"offer_id":"`+offerID+`","quantity":2,"terms_accepted":true}`))
+	req.Header.Set("Authorization", "Bearer "+alice.AccessToken)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	e.r.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("POST /reservations got %d: %s", w.Code, w.Body.String())
+	}
+	var created dto.ReservationResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	// Unauthenticated -> 401
+	w = httptest.NewRecorder()
+	e.r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/reservations/"+created.ID, nil))
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("unauthenticated GET /reservations/:id got %d, want 401", w.Code)
+	}
+
+	// Invalid UUID -> 400
+	req = httptest.NewRequest(http.MethodGet, "/reservations/not-a-uuid", nil)
+	req.Header.Set("Authorization", "Bearer "+alice.AccessToken)
+	w = httptest.NewRecorder()
+	e.r.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("invalid UUID GET /reservations/:id got %d, want 400", w.Code)
+	}
+
+	// Owner gets 200 with persisted confirmation details
+	req = httptest.NewRequest(http.MethodGet, "/reservations/"+created.ID, nil)
+	req.Header.Set("Authorization", "Bearer "+alice.AccessToken)
+	w = httptest.NewRecorder()
+	e.r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("GET /reservations/:id got %d: %s", w.Code, w.Body.String())
+	}
+	var confirmed dto.ReservationResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &confirmed); err != nil {
+		t.Fatalf("decode confirmation: %v", err)
+	}
+	if confirmed.ID != created.ID || confirmed.Reference != created.Reference || confirmed.PickupCode != created.PickupCode ||
+		confirmed.Status != "paid" || confirmed.Offer.Quantity != 2 || confirmed.TotalAmount != 80000 {
+		t.Errorf("confirmation mismatch: %+v", confirmed)
+	}
+
+	// Ownership enforcement: Bob cannot read Alice's reservation -> 404
+	req = httptest.NewRequest(http.MethodGet, "/reservations/"+created.ID, nil)
+	req.Header.Set("Authorization", "Bearer "+bob.AccessToken)
+	w = httptest.NewRecorder()
+	e.r.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("other user GET /reservations/:id got %d, want 404", w.Code)
+	}
+}
+
 func TestReservationConcurrentCheckoutPreventsOverselling(t *testing.T) {
 	e := newReservationsEnv(t)
 	offerID := "9d0c2a3e-1f5b-4a52-8c64-2f4e9b1a0c99"

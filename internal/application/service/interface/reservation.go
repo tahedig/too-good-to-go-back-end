@@ -20,7 +20,9 @@ type CreateReservationOutput struct {
 	Replayed    bool
 }
 
-// ReservationService handles customer reservation checkout (TEAM-49).
+// ReservationService handles customer reservation checkout (TEAM-49) and
+// confirmation details (TEAM-51).
 type ReservationService interface {
 	CreateReservation(ctx context.Context, userPublicID string, in CreateReservationInput) (*CreateReservationOutput, error)
+	GetReservation(ctx context.Context, userPublicID, reservationPublicID string) (*dto.ReservationResponse, error)
 }

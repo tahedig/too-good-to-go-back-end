@@ -116,4 +116,22 @@ func TestReservationServiceValidationAndErrors(t *testing.T) {
 	if repo.lastInput.IdempotencyPayloadHash == "" {
 		t.Error("expected non-empty idempotency payload hash")
 	}
+
+	// GetReservation: invalid UUID -> 400, not found -> 404, missing auth -> 401
+	if _, err := svc.GetReservation(context.Background(), "", resID); err == nil {
+		t.Fatal("expected 401")
+	} else if appErr, ok := err.(exception.AppError); !ok || appErr.StatusCode() != http.StatusUnauthorized {
+		t.Fatalf("want 401, got %v", err)
+	}
+	if _, err := svc.GetReservation(context.Background(), userID, "invalid"); err == nil {
+		t.Fatal("expected 400")
+	} else if appErr, ok := err.(exception.AppError); !ok || appErr.StatusCode() != http.StatusBadRequest {
+		t.Fatalf("want 400, got %v", err)
+	}
+	repo.getErr = repository.ErrReservationNotFound
+	if _, err := svc.GetReservation(context.Background(), userID, resID); err == nil {
+		t.Fatal("expected 404")
+	} else if appErr, ok := err.(exception.AppError); !ok || appErr.StatusCode() != http.StatusNotFound {
+		t.Fatalf("want 404, got %v", err)
+	}
 }

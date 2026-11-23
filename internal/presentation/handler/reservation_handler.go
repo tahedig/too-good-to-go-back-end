@@ -69,3 +69,31 @@ func (h *reservationHandler) CreateReservation(c *gin.Context) {
 	}
 	c.JSON(http.StatusCreated, out.Reservation)
 }
+
+// GetReservation godoc
+// @Summary      Get reservation confirmation details
+// @Description  Returns the persisted reservation confirmation details, reference, pickup code and current status. Enforces customer ownership (reservations owned by other users return 404).
+// @Tags         reservations
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Reservation public ID (UUID)"
+// @Success      200 {object} dto.ReservationResponse
+// @Failure      400 {object} dto.ErrorResponse "BAD_REQUEST: invalid reservation id"
+// @Failure      401 {object} dto.ErrorResponse "UNAUTHORIZED: missing or invalid bearer token"
+// @Failure      404 {object} dto.ErrorResponse "NOT_FOUND: reservation does not exist or belongs to another customer"
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /reservations/{id} [get]
+func (h *reservationHandler) GetReservation(c *gin.Context) {
+	res, err := h.svc.GetReservation(
+		c.Request.Context(),
+		c.GetString(bootstrap.CtxKeyUserID),
+		c.Param("id"),
+	)
+	if err != nil {
+		abortWithError(c, err)
+		return
+	}
+
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, res)
+}
