@@ -11,5 +11,10 @@ migrate-force:   ; $(MIGRATE) force $(v)      # after fixing a "dirty" state: ma
 migrate-new:     ; migrate create -ext sql -dir migrations -seq $(name)
 migrate-test:    ; bash scripts/test_migrations_local.sh   # no Docker needed
 migrate-test-docker: ; bash scripts/test_migrations.sh
+# Append to the repo Makefile
+.PHONY: db-backup db-restore db-backup-test
+db-backup:       ; bash scripts/db/backup.sh                    # needs DB_BACKUP_ENV, see docs/db-backup-restore.md
+db-restore:      ; bash scripts/db/restore.sh                   # latest backup -> tgtg_restore_<ts>, verified, then dropped
+db-backup-test:  ; bash scripts/db/test_backup_restore.sh       # self-contained, local PostgreSQL, run as non-root
 validate-branch: ; python3 scripts/validate_branch_name.py "$(branch)"
 validate-commit: ; python3 scripts/validate_commit_message.py "$(msg)"
