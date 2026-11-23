@@ -46,6 +46,12 @@ type FavoritesQuery struct {
 	Limit    *int
 }
 
+// OfferDetailQuery is the input of GET /offers/{id}.
+type OfferDetailQuery struct {
+	Lat, Lng *float64
+	UserID   *int64
+}
+
 // ---------- responses ----------
 
 type CatalogueStoreRef struct {
@@ -140,4 +146,42 @@ type CatalogueMapResponse struct {
 type FavoriteOfferResponse struct {
 	OfferID    string `json:"offer_id"`
 	IsFavorite bool   `json:"is_favorite" example:"true"`
+}
+
+// OfferDetailStore is the store block shown on the customer product details page.
+type OfferDetailStore struct {
+	ID                 string                `json:"id" example:"3f2b8f0e-6c1d-4c53-9a43-0d1d5c7a9e11"`
+	Name               string                `json:"name" example:"نان صبحگاهی"`
+	LogoURL            *string               `json:"logo_url,omitempty" example:"https://example.com/logo.png"`
+	City               string                `json:"city,omitempty" example:"تهران"`
+	District           *string               `json:"district,omitempty" example:"ولیعصر"`
+	Address            string                `json:"address" example:"تهران، خیابان ولیعصر، پلاک ۱۲"`
+	PickupInstructions string                `json:"pickup_instructions,omitempty" example:"در بازه تعیین‌شده از پیشخوان تحویل بگیرید."`
+	Location           StoreLocationResponse `json:"location"`
+}
+
+// OfferDetailResponse is the full payload for GET /offers/{id} (TEAM-47).
+type OfferDetailResponse struct {
+	ID                   string           `json:"id" example:"7d0c2a3e-1f5b-4a52-8c64-2f4e9b1a0c33"`
+	Title                string           `json:"title" example:"بسته غافلگیری نانوایی"`
+	Description          string           `json:"description" example:"ترکیبی از نان‌ها و شیرینی‌های باقی‌مانده پخت امروز."`
+	ImageURL             *string          `json:"image_url,omitempty"`
+	Price                int64            `json:"price" example:"40000"`
+	OriginalPrice        int64            `json:"original_price" example:"115000"`
+	DiscountPercent      int              `json:"discount_percent" example:"65"`
+	Currency             string           `json:"currency" example:"تومان"`
+	QuantityAvailable    int              `json:"quantity_available" example:"3"`
+	AvailabilityBadge    string           `json:"availability_badge" example:"۳ بسته موجود"`
+	PickupStart          time.Time        `json:"pickup_start"`
+	PickupEnd            time.Time        `json:"pickup_end"`
+	PickupWindow         string           `json:"pickup_window" example:"امروز، ۱۸:۰۰-۱۹:۰۰"`
+	CancellationDeadline time.Time        `json:"cancellation_deadline"`
+	CategorySlug         string           `json:"category_slug,omitempty" example:"bakery"`
+	CategoryName         string           `json:"category_name,omitempty" example:"نانوایی"`
+	Allergens            []FilterOption   `json:"allergens"`
+	AllergensDeclared    bool             `json:"allergens_declared" example:"false"`
+	DistanceM            *int64           `json:"distance_m,omitempty" example:"600"`
+	DistanceText         string           `json:"distance_text,omitempty" example:"۰.۶ کیلومتر"`
+	Store                OfferDetailStore `json:"store"`
+	IsFavorite           bool             `json:"is_favorite" example:"false"`
 }

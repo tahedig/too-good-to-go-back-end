@@ -14,6 +14,7 @@ type CatalogueService interface {
 	HomeLastChance(ctx context.Context, q dto.HomeQuery) (*dto.CatalogueOfferList, error)
 
 	SearchOffers(ctx context.Context, q dto.CatalogueQuery) (*dto.CatalogueOfferList, error)
+	OfferDetail(ctx context.Context, offerPublicID string, q dto.OfferDetailQuery) (*dto.OfferDetailResponse, error)
 	StoreOffers(ctx context.Context, storePublicID string, q dto.CatalogueQuery) (*dto.CatalogueOfferList, error)
 	Filters(ctx context.Context) (*dto.CatalogueFiltersResponse, error)
 	MapOffers(ctx context.Context, q dto.MapQuery) (*dto.CatalogueMapResponse, error)
