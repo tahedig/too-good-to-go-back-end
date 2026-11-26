@@ -94,6 +94,27 @@ func (s *reservationService) CreateReservation(
 	}, nil
 }
 
+func (s *reservationService) GetReservation(
+	ctx context.Context,
+	userPublicID, reservationPublicID string,
+) (*dto.ReservationResponse, error) {
+	if strings.TrimSpace(userPublicID) == "" {
+		return nil, exception.NewUnauthorized("authentication required")
+	}
+	id := strings.ToLower(strings.TrimSpace(reservationPublicID))
+	if !security.IsID(id) {
+		return nil, exception.NewBadRequest("invalid reservation id", []exception.FieldError{
+			{Field: "id", Message: "must be a valid UUID"},
+		})
+	}
+
+	res, err := s.repo.GetByPublicIDAndUser(ctx, id, strings.ToLower(strings.TrimSpace(userPublicID)))
+	if err != nil {
+		return nil, mapReservationError(err)
+	}
+	return toReservationDTO(res, s.now()), nil
+}
+
 func mapReservationError(err error) error {
 	switch {
 	case errors.Is(err, repository.ErrUserNotFound):
