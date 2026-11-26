@@ -116,11 +116,12 @@ func provideAuthService(
 // database is everything that moves from memory to PostgreSQL when
 // DATABASE_URL is set.
 type database struct {
-	users    repository.UserRepository
-	orders   repository.OrderRepository
-	vendors  repository.VendorApprovalRepository
-	pool     *pgxpool.Pool
-	checkers []serviceinterface.HealthChecker
+	users        repository.UserRepository
+	orders       repository.OrderRepository
+	reservations repository.ReservationRepository
+	vendors      repository.VendorApprovalRepository
+	pool         *pgxpool.Pool
+	checkers     []serviceinterface.HealthChecker
 }
 
 const dbConnectTimeout = 5 * time.Second
@@ -132,8 +133,13 @@ const dbConnectTimeout = 5 * time.Second
 func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func(), error) {
 	if cfg.DatabaseURL == "" {
 		log.Warn("DATABASE_URL is not set: users and orders are kept in memory, are lost on restart and are not shared between instances")
-		return &database{users: memory.NewUserRepository(), orders: memory.NewOrderRepository(),
-			vendors: memory.NewVendorApprovalRepository()}, func() {}, nil
+		memOrders := memory.NewOrderRepository()
+		return &database{
+			users:        memory.NewUserRepository(),
+			orders:       memOrders,
+			reservations: memory.NewReservationRepository(memOrders),
+			vendors:      memory.NewVendorApprovalRepository(),
+		}, func() {}, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbConnectTimeout)
@@ -150,15 +156,20 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 	log.Info("connected to postgres", "host", connCfg.Host, "port", connCfg.Port, "database", connCfg.Database)
 
 	return &database{
-		users:    postgres.NewUserRepository(pool),
-		orders:   postgres.NewOrderRepository(pool),
-		checkers: []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
+		users:        postgres.NewUserRepository(pool),
+		orders:       postgres.NewOrderRepository(pool),
+		reservations: postgres.NewReservationRepository(pool),
+		checkers:     []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
 	}, pool.Close, nil
 }
 
 func provideUserRepository(db *database) repository.UserRepository { return db.users }
 
 func provideOrderRepository(db *database) repository.OrderRepository { return db.orders }
+
+func provideReservationRepository(db *database) repository.ReservationRepository {
+	return db.reservations
+}
 
 func provideVendorApprovalRepository(db *database) repository.VendorApprovalRepository {
 	return db.vendors
@@ -198,6 +209,7 @@ func provideHandlers(
 	protected handlerinterface.ProtectedHandler,
 	profile handlerinterface.ProfileHandler,
 	order handlerinterface.OrderHandler,
+	reservation handlerinterface.ReservationHandler,
 	vendorApproval handlerinterface.VendorApprovalHandler,
 ) router.Handlers {
 	return router.Handlers{
@@ -208,6 +220,7 @@ func provideHandlers(
 		Protected:      protected,
 		Profile:        profile,
 		Order:          order,
+		Reservation:    reservation,
 		VendorApproval: vendorApproval,
 	}
 }
