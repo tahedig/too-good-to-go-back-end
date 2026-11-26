@@ -7,13 +7,14 @@ CREATE TABLE store_working_hours (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     store_id    BIGINT       NOT NULL,
     day_of_week SMALLINT     NOT NULL,
-    open_time   TIME         NOT NULL,
-    close_time  TIME         NOT NULL,
+    open_time   TIME,
+    close_time  TIME,
     is_closed   BOOLEAN      NOT NULL DEFAULT false,
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT store_working_hours_store_fkey      FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
     CONSTRAINT store_working_hours_day_chk         CHECK (day_of_week BETWEEN 0 AND 6),
+    CONSTRAINT store_working_hours_times_chk       CHECK (is_closed OR (open_time IS NOT NULL AND close_time IS NOT NULL)),
     CONSTRAINT store_working_hours_store_day_key   UNIQUE (store_id, day_of_week)
 );
 
