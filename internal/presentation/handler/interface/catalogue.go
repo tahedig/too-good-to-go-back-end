@@ -9,6 +9,7 @@ type CatalogueHandler interface {
 	HomeLastChance(c *gin.Context)
 
 	SearchOffers(c *gin.Context)
+	OfferDetail(c *gin.Context)
 	StoreOffers(c *gin.Context)
 	Filters(c *gin.Context)
 	MapOffers(c *gin.Context)
