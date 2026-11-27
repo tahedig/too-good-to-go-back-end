@@ -47,10 +47,10 @@ func (s *stubOfferDetailCatalogueRepo) OfferDetail(_ context.Context, id string,
 	}
 	return nil, nil
 }
-func (s *stubOfferDetailCatalogueRepo) AddFavorite(context.Context, int64, string) (bool, error) {
+func (s *stubOfferDetailCatalogueRepo) AddFavorite(context.Context, string, string) (bool, error) {
 	return false, nil
 }
-func (s *stubOfferDetailCatalogueRepo) RemoveFavorite(context.Context, int64, string) error {
+func (s *stubOfferDetailCatalogueRepo) RemoveFavorite(context.Context, string, string) error {
 	return nil
 }
 func (s *stubOfferDetailCatalogueRepo) UserExists(context.Context, int64) (bool, error) {
