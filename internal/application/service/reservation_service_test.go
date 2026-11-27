@@ -116,4 +116,20 @@ func TestReservationServiceValidationAndErrors(t *testing.T) {
 	if repo.lastInput.IdempotencyPayloadHash == "" {
 		t.Error("expected non-empty idempotency payload hash")
 	}
+	if out.Reservation.CancellationDeadline == nil || !out.Reservation.CancellationDeadline.Equal(ps.Add(-2*time.Hour)) {
+		t.Errorf("got default cancellation deadline %v, want %v", out.Reservation.CancellationDeadline, ps.Add(-2*time.Hour))
+	}
+
+	// Explicit cancellation_deadline overrides the 2h default
+	customCD := ps.Add(-30 * time.Minute)
+	repo.createRes.Reservation.CancellationDeadline = &customCD
+	out2, err := svc.CreateReservation(context.Background(), userID, serviceinterface.CreateReservationInput{
+		OfferID: offerID, Quantity: 2, IdempotencyKey: "req-2",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out2.Reservation.CancellationDeadline == nil || !out2.Reservation.CancellationDeadline.Equal(customCD) {
+		t.Errorf("got explicit cancellation deadline %v, want %v", out2.Reservation.CancellationDeadline, customCD)
+	}
 }

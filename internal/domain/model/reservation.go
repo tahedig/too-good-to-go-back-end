@@ -19,10 +19,11 @@ type Reservation struct {
 	ItemsTotal  int64
 	ServiceFee  int64
 	TotalAmount int64
-	Currency    string
-	PickupStart *time.Time
-	PickupEnd   *time.Time
-	CreatedAt   time.Time
+	Currency             string
+	PickupStart          *time.Time
+	PickupEnd            *time.Time
+	CancellationDeadline *time.Time
+	CreatedAt            time.Time
 }
 
 // ReservationStore is the store where the customer picks up the reservation.

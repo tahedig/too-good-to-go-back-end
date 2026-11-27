@@ -19,9 +19,8 @@ import (
 )
 
 const (
-	maxReservationQuantity        = 50
-	maxReservationIdempotencyLen  = 128
-	reservationCancellationCutoff = 2 * time.Hour
+	maxReservationQuantity       = 50
+	maxReservationIdempotencyLen = 128
 )
 
 type reservationService struct {
@@ -175,7 +174,10 @@ func toReservationDTO(r *model.Reservation, now time.Time) *dto.ReservationRespo
 		resp.PickupWindow = pickupWindowText(*r.PickupStart, *r.PickupEnd, now)
 	}
 	if r.PickupStart != nil {
-		dl := r.PickupStart.UTC().Add(-reservationCancellationCutoff)
+		dl := resolveCancellationDeadline(r.CancellationDeadline, *r.PickupStart)
+		resp.CancellationDeadline = &dl
+	} else if r.CancellationDeadline != nil {
+		dl := r.CancellationDeadline.UTC()
 		resp.CancellationDeadline = &dl
 	}
 	return resp
