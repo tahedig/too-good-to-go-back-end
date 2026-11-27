@@ -27,13 +27,27 @@ func provideCatalogueHandler(svc serviceinterface.CatalogueService) handlerinter
 	return handler.NewCatalogueHandler(svc)
 }
 
-// provideUserAuth wires the TEMPORARY X-Dev-User-Id authentication, enabled only when APP_ENV=development.
-// Replace it with the real token middleware once /auth/otp/verify issues tokens.
-func provideUserAuth(cfg *bootstrap.Config, svc serviceinterface.CatalogueService) middlewareinterface.UserAuth {
-	if svc == nil {
+// provideUserAuth wires Bearer JWT authentication for catalogue and favorite
+// routes, with X-Dev-User-Id fallback in development when no Authorization header is sent.
+func provideUserAuth(
+	cfg *bootstrap.Config,
+	db *database,
+	svc serviceinterface.CatalogueService,
+	sessions serviceinterface.SessionService,
+) middlewareinterface.UserAuth {
+	if svc == nil || db == nil || db.pool == nil {
 		return nil
 	}
-	return middleware.NewDevUserAuth(func(ctx context.Context, id int64) (bool, error) {
+	dev := middleware.NewDevUserAuth(func(ctx context.Context, id int64) (bool, error) {
 		return svc.UserExists(ctx, id)
 	}, cfg.AppEnv == bootstrap.EnvDevelopment)
+	if sessions == nil {
+		return dev
+	}
+	resolveDBID := func(ctx context.Context, publicID string) (int64, error) {
+		var id int64
+		err := db.pool.QueryRow(ctx, `SELECT id FROM users WHERE public_id = $1::uuid AND deleted_at IS NULL`, publicID).Scan(&id)
+		return id, err
+	}
+	return middleware.NewHybridUserAuth(sessions, resolveDBID, dev)
 }

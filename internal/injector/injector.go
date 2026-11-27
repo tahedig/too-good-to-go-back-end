@@ -22,6 +22,7 @@ import (
 	redisrepo "github.com/tahedig/too-good-to-go/backend/internal/infrastructure/repository/redis"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/sms"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/token"
+	"github.com/tahedig/too-good-to-go/backend/internal/presentation/handler"
 	handlerinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/handler/interface"
 	middlewareinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/router"
@@ -116,11 +117,14 @@ func provideAuthService(
 // database is everything that moves from memory to PostgreSQL when
 // DATABASE_URL is set.
 type database struct {
-	users    repository.UserRepository
-	orders   repository.OrderRepository
-	vendors  repository.VendorApprovalRepository
-	pool     *pgxpool.Pool
-	checkers []serviceinterface.HealthChecker
+	users         repository.UserRepository
+	orders        repository.OrderRepository
+	vendors       repository.VendorApprovalRepository
+	stores        repository.StoreRepository
+	offers        repository.OfferRepository
+	storeRequests repository.StoreRequestRepository
+	pool          *pgxpool.Pool
+	checkers      []serviceinterface.HealthChecker
 }
 
 const dbConnectTimeout = 5 * time.Second
@@ -150,9 +154,14 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 	log.Info("connected to postgres", "host", connCfg.Host, "port", connCfg.Port, "database", connCfg.Database)
 
 	return &database{
-		users:    postgres.NewUserRepository(pool),
-		orders:   postgres.NewOrderRepository(pool),
-		checkers: []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
+		users:         postgres.NewUserRepository(pool),
+		orders:        postgres.NewOrderRepository(pool),
+		vendors:       postgres.NewVendorApprovalRepository(pool),
+		stores:        postgres.NewStoreRepository(pool),
+		offers:        postgres.NewOfferRepository(pool),
+		storeRequests: postgres.NewStoreRequestRepository(pool),
+		pool:          pool,
+		checkers:      []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
 	}, pool.Close, nil
 }
 
@@ -162,6 +171,56 @@ func provideOrderRepository(db *database) repository.OrderRepository { return db
 
 func provideVendorApprovalRepository(db *database) repository.VendorApprovalRepository {
 	return db.vendors
+}
+
+func provideStoreRepository(db *database) repository.StoreRepository { return db.stores }
+
+func provideOfferRepository(db *database) repository.OfferRepository { return db.offers }
+
+func provideStoreRequestRepository(db *database) repository.StoreRequestRepository {
+	return db.storeRequests
+}
+
+func provideStoreService(stores repository.StoreRepository) serviceinterface.StoreService {
+	if stores == nil {
+		return nil
+	}
+	return service.NewStoreService(stores)
+}
+
+func provideStoreRequestService(reqs repository.StoreRequestRepository) serviceinterface.StoreRequestService {
+	if reqs == nil {
+		return nil
+	}
+	return service.NewStoreRequestService(reqs)
+}
+
+func providePublicStoreService(stores repository.StoreRepository, offers repository.OfferRepository) serviceinterface.PublicStoreService {
+	if stores == nil {
+		return nil
+	}
+	return service.NewPublicStoreService(stores, offers)
+}
+
+func provideStoreHandler(svc serviceinterface.StoreService) handlerinterface.StoreHandler {
+	if svc == nil {
+		return nil
+	}
+	return handler.NewStoreHandler(svc)
+}
+
+func provideStoreRequestHandler(svc serviceinterface.StoreRequestService) handlerinterface.StoreRequestHandler {
+	if svc == nil {
+		return nil
+	}
+	return handler.NewStoreRequestHandler(svc)
+}
+
+func providePublicStoreHandler(svc serviceinterface.PublicStoreService) handlerinterface.PublicStoreHandler {
+	if svc == nil {
+		return nil
+	}
+	return handler.NewPublicStoreHandler(svc)
 }
 
 // providePhoneRoles maps ADMIN_PHONES / VENDOR_PHONES to the role a new user
@@ -199,6 +258,9 @@ func provideHandlers(
 	profile handlerinterface.ProfileHandler,
 	order handlerinterface.OrderHandler,
 	vendorApproval handlerinterface.VendorApprovalHandler,
+	store handlerinterface.StoreHandler,
+	storeRequest handlerinterface.StoreRequestHandler,
+	publicStore handlerinterface.PublicStoreHandler,
 ) router.Handlers {
 	return router.Handlers{
 		Health:         health,
@@ -209,5 +271,8 @@ func provideHandlers(
 		Profile:        profile,
 		Order:          order,
 		VendorApproval: vendorApproval,
+		Store:          store,
+		StoreRequest:   storeRequest,
+		PublicStore:    publicStore,
 	}
 }
