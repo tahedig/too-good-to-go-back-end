@@ -120,6 +120,7 @@ type database struct {
 	orders       repository.OrderRepository
 	reservations repository.ReservationRepository
 	vendors      repository.VendorApprovalRepository
+	adminStores  repository.AdminStoreRepository
 	pool         *pgxpool.Pool
 	checkers     []serviceinterface.HealthChecker
 }
@@ -139,6 +140,7 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 			orders:       memOrders,
 			reservations: memory.NewReservationRepository(memOrders),
 			vendors:      memory.NewVendorApprovalRepository(),
+			adminStores:  memory.NewAdminStoreRepository(),
 		}, func() {}, nil
 	}
 
@@ -159,6 +161,9 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 		users:        postgres.NewUserRepository(pool),
 		orders:       postgres.NewOrderRepository(pool),
 		reservations: postgres.NewReservationRepository(pool),
+		vendors:      postgres.NewVendorApprovalRepository(pool),
+		adminStores:  postgres.NewAdminStoreRepository(pool),
+		pool:         pool,
 		checkers:     []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
 	}, pool.Close, nil
 }
@@ -173,6 +178,10 @@ func provideReservationRepository(db *database) repository.ReservationRepository
 
 func provideVendorApprovalRepository(db *database) repository.VendorApprovalRepository {
 	return db.vendors
+}
+
+func provideAdminStoreRepository(db *database) repository.AdminStoreRepository {
+	return db.adminStores
 }
 
 // providePhoneRoles maps ADMIN_PHONES / VENDOR_PHONES to the role a new user
@@ -211,6 +220,7 @@ func provideHandlers(
 	order handlerinterface.OrderHandler,
 	reservation handlerinterface.ReservationHandler,
 	vendorApproval handlerinterface.VendorApprovalHandler,
+	adminStore handlerinterface.AdminStoreHandler,
 ) router.Handlers {
 	return router.Handlers{
 		Health:         health,
@@ -222,5 +232,6 @@ func provideHandlers(
 		Order:          order,
 		Reservation:    reservation,
 		VendorApproval: vendorApproval,
+		AdminStore:     adminStore,
 	}
 }
