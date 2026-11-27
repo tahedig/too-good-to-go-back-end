@@ -1,7 +1,7 @@
 # Staging backend deployment
 
 GitHub Actions validates the Docker build on pull requests. A successful push
-to `develop` publishes `develop` and `develop-<commit-sha>` to GHCR. The staging
+to `main` publishes `main` and `main-<commit-sha>` to GHCR. The staging
 server polls the moving tag, verifies the matching immutable tag, and deploys
 only when the embedded commit SHA changes.
 

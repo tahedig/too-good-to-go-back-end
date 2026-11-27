@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 
 readonly registry_image="${BACKEND_REGISTRY_IMAGE:-ghcr.io/tahedig/too-good-to-go-back-end}"
-readonly tracking_image="${registry_image}:develop"
+readonly tracking_image="${registry_image}:main"
 readonly deploy_dir="${BACKEND_DEPLOY_DIR:-/home/fpna/apps/backend}"
 readonly health_url="${STAGING_BACKEND_HEALTH_URL:-http://127.0.0.1:8081}"
 readonly container_name="staging-backend-api"
@@ -34,7 +34,7 @@ if [[ ! "$candidate_sha" =~ ^[0-9a-f]{40}$ ]]; then
   exit 1
 fi
 
-candidate_image="${registry_image}:develop-${candidate_sha}"
+candidate_image="${registry_image}:main-${candidate_sha}"
 docker pull "$candidate_image"
 
 tracking_id="$(docker image inspect "$tracking_image" --format '{{.Id}}')"

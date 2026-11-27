@@ -132,7 +132,7 @@ deploy() {
     echo "Expected SHA must be a full 40-character Git commit SHA" >&2
     return 1
   fi
-  if [[ "$new_image" != *":develop-$expected_sha" ]]; then
+  if [[ "$new_image" != *":main-$expected_sha" ]]; then
     echo "Image tag does not match the expected commit SHA" >&2
     return 1
   fi
