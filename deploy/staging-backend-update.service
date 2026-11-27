@@ -1,0 +1,17 @@
+[Unit]
+Description=Check and deploy the latest healthy develop backend image
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=fpna
+Group=fpna
+WorkingDirectory=/home/fpna/apps/backend
+Environment=HOME=/home/fpna
+Environment=BACKEND_DEPLOY_DIR=/home/fpna/apps/backend
+Environment=STAGING_BACKEND_HEALTH_URL=http://127.0.0.1:8081
+ExecStart=/home/fpna/apps/backend/poll-staging-image.sh
+TimeoutStartSec=15min
+UMask=0077
