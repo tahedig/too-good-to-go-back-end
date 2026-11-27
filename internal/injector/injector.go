@@ -159,6 +159,7 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 		users:        postgres.NewUserRepository(pool),
 		orders:       postgres.NewOrderRepository(pool),
 		reservations: postgres.NewReservationRepository(pool),
+		pool:         pool,
 		checkers:     []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
 	}, pool.Close, nil
 }

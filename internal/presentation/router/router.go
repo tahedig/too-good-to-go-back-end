@@ -155,7 +155,7 @@ func New(
 		r.HEAD("/stores/:id", h.PublicStore.GetPublicStore)
 	}
 
-	registerCatalogue(r, h)
+	registerCatalogue(r, h, authMW)
 
 	return r, nil
 }

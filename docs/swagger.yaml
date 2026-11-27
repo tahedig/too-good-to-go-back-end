@@ -1271,11 +1271,6 @@ paths:
         in: query
         name: cursor
         type: string
-      - description: 'DEV auth: users.id'
-        in: header
-        name: X-Dev-User-Id
-        required: true
-        type: integer
       produces:
       - application/json
       responses:
@@ -1291,6 +1286,8 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: My favorite offers
       tags:
       - favorites
@@ -1304,11 +1301,6 @@ paths:
         name: id
         required: true
         type: string
-      - description: 'DEV auth: users.id'
-        in: header
-        name: X-Dev-User-Id
-        required: true
-        type: integer
       responses:
         "204":
           description: No Content
@@ -1320,6 +1312,8 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Remove offer from favorites
       tags:
       - favorites
@@ -1332,11 +1326,6 @@ paths:
         name: id
         required: true
         type: string
-      - description: 'DEV auth: users.id'
-        in: header
-        name: X-Dev-User-Id
-        required: true
-        type: integer
       produces:
       - application/json
       responses:
@@ -1356,6 +1345,8 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Add offer to favorites
       tags:
       - favorites

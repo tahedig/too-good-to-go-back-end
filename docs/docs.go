@@ -641,6 +641,11 @@ const docTemplate = `{
         },
         "/favorites/offers": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "لیست علاقه‌مندی‌ها، جدیدترین اول. فقط آفرهایی که همین الان قابل خرید هستند نمایش داده می‌شوند.",
                 "produces": [
                     "application/json"
@@ -676,13 +681,6 @@ const docTemplate = `{
                         "description": "next_cursor of the previous page",
                         "name": "cursor",
                         "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "DEV auth: users.id",
-                        "name": "X-Dev-User-Id",
-                        "in": "header",
-                        "required": true
                     }
                 ],
                 "responses": {
@@ -709,6 +707,11 @@ const docTemplate = `{
         },
         "/favorites/offers/{id}": {
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "افزودن به علاقه‌مندی. idempotent است: تکرار درخواست خطا نمی‌دهد. {id} همان public id آفر است. آفر ناشناس یا غیرقابل‌نمایش ۴۰۴ می‌دهد.",
                 "produces": [
                     "application/json"
@@ -723,13 +726,6 @@ const docTemplate = `{
                         "description": "Offer public id (UUID)",
                         "name": "id",
                         "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "DEV auth: users.id",
-                        "name": "X-Dev-User-Id",
-                        "in": "header",
                         "required": true
                     }
                 ],
@@ -761,6 +757,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "حذف از علاقه‌مندی. idempotent است و همیشه ۲۰۴ برمی‌گرداند (وجود یا عدم وجود آفر لو نمی‌رود).",
                 "tags": [
                     "favorites"
@@ -772,13 +773,6 @@ const docTemplate = `{
                         "description": "Offer public id (UUID)",
                         "name": "id",
                         "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "DEV auth: users.id",
-                        "name": "X-Dev-User-Id",
-                        "in": "header",
                         "required": true
                     }
                 ],
