@@ -106,19 +106,29 @@ WHERE public_id = $1::uuid AND deleted_at IS NULL`, storeID, isActive)
 }
 
 const selectStoreSubscriptionQuery = `
-SELECT ss.public_id::text, s.public_id::text, ss.status::text, p.name_fa,
-       ss.commission_rate::double precision, ss.period_start, ss.period_end,
-       GREATEST(0, CEIL(EXTRACT(EPOCH FROM (ss.period_end - now())) / 86400))::int,
-       up.name_fa
+SELECT sub.public_id::text, s.public_id::text,
+       CASE WHEN upgrade.name_fa IS NOT NULL THEN 'pending_review' ELSE sub.status::text END,
+       plan.name_fa, plan.commission_rate::double precision, sub.starts_at, sub.ends_at,
+       GREATEST(0, CEIL(EXTRACT(EPOCH FROM (sub.ends_at - now())) / 86400))::int,
+       upgrade.name_fa
 FROM stores s
 LEFT JOIN LATERAL (
-    SELECT * FROM store_subscriptions
-    WHERE store_id = s.id
-    ORDER BY created_at DESC, id DESC
+    SELECT vs.public_id, vs.status, vs.plan_id, vs.starts_at, vs.ends_at
+    FROM vendor_subscriptions vs
+    WHERE vs.vendor_id = s.vendor_id
+    ORDER BY (vs.status = 'active') DESC, vs.created_at DESC, vs.id DESC
     LIMIT 1
-) ss ON true
-LEFT JOIN subscription_plans p ON p.id = ss.plan_id
-LEFT JOIN subscription_plans up ON up.id = ss.upgrade_plan_id
+) sub ON true
+LEFT JOIN subscription_plans plan ON plan.id = sub.plan_id
+LEFT JOIN LATERAL (
+    SELECT requested_plan.name_fa
+    FROM vendor_subscriptions request
+    JOIN subscription_plans requested_plan ON requested_plan.id = request.plan_id
+    WHERE request.vendor_id = s.vendor_id AND request.status = 'pending_review'
+      AND sub.status = 'active' AND request.plan_id <> sub.plan_id
+    ORDER BY request.created_at DESC, request.id DESC
+    LIMIT 1
+) upgrade ON true
 WHERE s.deleted_at IS NULL AND s.public_id = $1::uuid`
 
 func (r *adminStoreRepository) GetStoreSubscription(ctx context.Context, storeID string) (*model.AdminStoreSubscription, error) {
@@ -140,17 +150,22 @@ func (r *adminStoreRepository) GetStoreSubscription(ctx context.Context, storeID
 	if subID == nil {
 		return nil, repository.ErrAdminSubscriptionNotFound
 	}
-	return &model.AdminStoreSubscription{
+	subscription := &model.AdminStoreSubscription{
 		ID:             *subID,
 		StoreID:        *sID,
 		Status:         *status,
 		CurrentPlan:    *planName,
 		CommissionRate: *commission,
-		PeriodStart:    *periodStart,
-		PeriodEnd:      *periodEnd,
 		RemainingDays:  *remainingDays,
 		UpgradeRequest: upgradePlan,
-	}, nil
+	}
+	if periodStart != nil {
+		subscription.PeriodStart = *periodStart
+	}
+	if periodEnd != nil {
+		subscription.PeriodEnd = *periodEnd
+	}
+	return subscription, nil
 }
 
 const selectAdminOfferBase = `
