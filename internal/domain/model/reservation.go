@@ -10,15 +10,15 @@ import (
 // Reservation is a customer-owned reservation persisted in the orders and
 // order_items tables (TEAM-49 & TEAM-51). IDs are public UUIDs; amounts are in Toman.
 type Reservation struct {
-	ID          string
-	Reference   string
-	PickupCode  string
-	Status      enum.OrderStatus
-	Store       ReservationStore
-	Offer       ReservationOffer
-	ItemsTotal  int64
-	ServiceFee  int64
-	TotalAmount int64
+	ID                   string
+	Reference            string
+	PickupCode           string
+	Status               enum.OrderStatus
+	Store                ReservationStore
+	Offer                ReservationOffer
+	ItemsTotal           int64
+	ServiceFee           int64
+	TotalAmount          int64
 	Currency             string
 	PickupStart          *time.Time
 	PickupEnd            *time.Time
