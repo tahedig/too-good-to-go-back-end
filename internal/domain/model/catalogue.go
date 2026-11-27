@@ -140,3 +140,34 @@ type CatalogueFilterData struct {
 	PriceMax   int64
 	OfferCount int64
 }
+
+// CatalogueOfferDetail is the full customer-facing product details record read
+// through the eligible_offers view (TEAM-47).
+type CatalogueOfferDetail struct {
+	ID                      int64
+	PublicID                string
+	Title                   string
+	Description             string
+	ImageURL                *string
+	Price                   int64
+	OriginalPrice           int64
+	DiscountPercent         int
+	Currency                string
+	QuantityAvailable       int
+	PickupStart             time.Time
+	PickupEnd               time.Time
+	CategorySlug            string
+	CategoryName            string
+	Allergens               []CatalogueAllergen
+	StorePublicID           string
+	StoreName               string
+	StoreLogoURL            *string
+	StoreCity               string
+	StoreDistrict           *string
+	StoreAddressLine        string
+	StorePickupInstructions string
+	StoreLat                float64
+	StoreLng                float64
+	DistanceM               *int64
+	IsFavorite              bool
+}

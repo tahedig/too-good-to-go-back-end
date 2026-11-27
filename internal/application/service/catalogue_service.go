@@ -43,6 +43,8 @@ const (
 	catKindBakery       = "bakery"
 	catKindReadyMeal    = "ready_meal"
 	catKindGrocery      = "grocery"
+
+	cancellationCutoffBeforePickup = 2 * time.Hour
 )
 
 var catAllergenCodes = []string{"gluten", "dairy", "egg", "peanut", "nuts", "soy", "fish", "shellfish", "sesame"}
@@ -357,6 +359,85 @@ func (s *catalogueService) UserExists(ctx context.Context, userID int64) (bool, 
 		return false, exception.NewInternalServer(err)
 	}
 	return ok, nil
+}
+
+// ---------------------------------------------------------------- product details (TEAM-47)
+
+func (s *catalogueService) OfferDetail(ctx context.Context, offerPublicID string, q dto.OfferDetailQuery) (*dto.OfferDetailResponse, error) {
+	v := &catValidator{}
+	id, parseErr := uuid.Parse(strings.TrimSpace(offerPublicID))
+	if parseErr != nil {
+		v.add("id", "must be a valid UUID")
+	}
+	lat, lng := v.latLng(q.Lat, q.Lng)
+	if err := v.err(); err != nil {
+		return nil, err
+	}
+
+	row, err := s.repo.OfferDetail(ctx, id.String(), lat, lng, q.UserID)
+	if err != nil {
+		return nil, exception.NewInternalServer(err)
+	}
+	if row == nil {
+		return nil, exception.NewNotFound("offer not found")
+	}
+
+	allergens := make([]dto.FilterOption, 0, len(row.Allergens))
+	for _, a := range row.Allergens {
+		allergens = append(allergens, dto.FilterOption{Value: a.Code, Label: a.NameFA})
+	}
+
+	now := s.now()
+	return &dto.OfferDetailResponse{
+		ID:                   row.PublicID,
+		Title:                row.Title,
+		Description:          row.Description,
+		ImageURL:             row.ImageURL,
+		Price:                row.Price,
+		OriginalPrice:        row.OriginalPrice,
+		DiscountPercent:      row.DiscountPercent,
+		Currency:             row.Currency,
+		QuantityAvailable:    row.QuantityAvailable,
+		AvailabilityBadge:    availabilityBadge(row.QuantityAvailable),
+		PickupStart:          row.PickupStart,
+		PickupEnd:            row.PickupEnd,
+		PickupWindow:         pickupWindowText(row.PickupStart, row.PickupEnd, now),
+		CancellationDeadline: cancellationDeadline(row.PickupStart),
+		CategorySlug:         row.CategorySlug,
+		CategoryName:         row.CategoryName,
+		Allergens:            allergens,
+		AllergensDeclared:    len(allergens) > 0,
+		DistanceM:            row.DistanceM,
+		DistanceText:         distanceText(row.DistanceM),
+		Store: dto.OfferDetailStore{
+			ID:                 row.StorePublicID,
+			Name:               row.StoreName,
+			LogoURL:            row.StoreLogoURL,
+			City:               row.StoreCity,
+			District:           row.StoreDistrict,
+			Address:            joinPersianAddress(row.StoreCity, row.StoreAddressLine),
+			PickupInstructions: row.StorePickupInstructions,
+			Location:           dto.StoreLocationResponse{Latitude: row.StoreLat, Longitude: row.StoreLng},
+		},
+		IsFavorite: row.IsFavorite,
+	}, nil
+}
+
+func cancellationDeadline(pickupStart time.Time) time.Time {
+	return pickupStart.UTC().Add(-cancellationCutoffBeforePickup)
+}
+
+func joinPersianAddress(city, line string) string {
+	city = strings.TrimSpace(city)
+	line = strings.TrimSpace(line)
+	switch {
+	case city == "":
+		return line
+	case line == "":
+		return city
+	default:
+		return city + "، " + line
+	}
 }
 
 // ---------------------------------------------------------------- validation
