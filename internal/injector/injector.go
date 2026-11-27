@@ -121,6 +121,7 @@ type database struct {
 	orders        repository.OrderRepository
 	reservations  repository.ReservationRepository
 	vendors       repository.VendorApprovalRepository
+	adminStores   repository.AdminStoreRepository
 	stores        repository.StoreRepository
 	offers        repository.OfferRepository
 	storeRequests repository.StoreRequestRepository
@@ -143,6 +144,7 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 			orders:       memOrders,
 			reservations: memory.NewReservationRepository(memOrders),
 			vendors:      memory.NewVendorApprovalRepository(),
+			adminStores:  memory.NewAdminStoreRepository(),
 		}, func() {}, nil
 	}
 
@@ -164,6 +166,7 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 		orders:        postgres.NewOrderRepository(pool),
 		reservations:  postgres.NewReservationRepository(pool),
 		vendors:       postgres.NewVendorApprovalRepository(pool),
+		adminStores:   postgres.NewAdminStoreRepository(pool),
 		stores:        postgres.NewStoreRepository(pool),
 		offers:        postgres.NewOfferRepository(pool),
 		storeRequests: postgres.NewStoreRequestRepository(pool),
@@ -182,6 +185,10 @@ func provideReservationRepository(db *database) repository.ReservationRepository
 
 func provideVendorApprovalRepository(db *database) repository.VendorApprovalRepository {
 	return db.vendors
+}
+
+func provideAdminStoreRepository(db *database) repository.AdminStoreRepository {
+	return db.adminStores
 }
 
 func provideStoreRepository(db *database) repository.StoreRepository { return db.stores }
@@ -270,6 +277,7 @@ func provideHandlers(
 	order handlerinterface.OrderHandler,
 	reservation handlerinterface.ReservationHandler,
 	vendorApproval handlerinterface.VendorApprovalHandler,
+	adminStore handlerinterface.AdminStoreHandler,
 	store handlerinterface.StoreHandler,
 	storeRequest handlerinterface.StoreRequestHandler,
 	publicStore handlerinterface.PublicStoreHandler,
@@ -284,6 +292,7 @@ func provideHandlers(
 		Order:          order,
 		Reservation:    reservation,
 		VendorApproval: vendorApproval,
+		AdminStore:     adminStore,
 		Store:          store,
 		StoreRequest:   storeRequest,
 		PublicStore:    publicStore,

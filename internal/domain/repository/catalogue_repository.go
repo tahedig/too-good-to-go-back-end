@@ -19,9 +19,9 @@ type CatalogueRepository interface {
 	OfferDetail(ctx context.Context, offerPublicID string, lat, lng *float64, userID *int64) (*model.CatalogueOfferDetail, error)
 
 	// AddFavorite is idempotent. found=false means the offer is not visible to customers.
-	AddFavorite(ctx context.Context, userID int64, offerPublicID string) (found bool, err error)
+	AddFavorite(ctx context.Context, userPublicID, offerPublicID string) (found bool, err error)
 	// RemoveFavorite is idempotent and never reveals whether the offer exists.
-	RemoveFavorite(ctx context.Context, userID int64, offerPublicID string) error
+	RemoveFavorite(ctx context.Context, userPublicID, offerPublicID string) error
 
 	UserExists(ctx context.Context, userID int64) (bool, error)
 }

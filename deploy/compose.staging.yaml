@@ -1,0 +1,79 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: staging-backend-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+    volumes:
+      - backend-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    networks:
+      staging-app:
+        aliases:
+          - db
+
+  redis:
+    image: redis:7-alpine
+    container_name: staging-backend-redis
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    command:
+      - sh
+      - -ec
+      - exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+    volumes:
+      - backend-redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    networks:
+      staging-app:
+        aliases:
+          - redis
+
+  api:
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE must reference an immutable commit-tagged image}
+    container_name: staging-backend-api
+    pull_policy: always
+    env_file:
+      - .env
+    ports:
+      - "${BACKEND_BIND:-127.0.0.1}:${BACKEND_PORT:-8081}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 6
+    stop_grace_period: 15s
+    restart: unless-stopped
+    networks:
+      staging-app:
+        aliases:
+          - api
+
+networks:
+  staging-app:
+    external: true
+    name: ${APP_NETWORK:-staging-app}
+
+volumes:
+  backend-pgdata:
+    name: staging-backend-pgdata
+  backend-redisdata:
+    name: staging-backend-redisdata
