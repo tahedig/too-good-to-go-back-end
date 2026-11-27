@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"reflect"
 	"testing"
 	"time"
 
@@ -21,8 +22,9 @@ import (
 )
 
 type adminManagementRepositoryStub struct {
-	store  *model.Store
-	filter repository.AdminStoreFilter
+	store       *model.Store
+	filter      repository.AdminStoreFilter
+	updateCalls int
 }
 
 func (r *adminManagementRepositoryStub) ListAdmin(_ context.Context, filter repository.AdminStoreFilter) (*repository.AdminStorePage, error) {
@@ -31,7 +33,11 @@ func (r *adminManagementRepositoryStub) ListAdmin(_ context.Context, filter repo
 }
 
 func (r *adminManagementRepositoryStub) GetByPublicID(_ context.Context, _ string) (*model.Store, error) {
-	return r.store, nil
+	if r.store == nil {
+		return nil, nil
+	}
+	store := *r.store
+	return &store, nil
 }
 
 func (r *adminManagementRepositoryStub) CategoryIsActive(_ context.Context, _ int16) (bool, error) {
@@ -39,6 +45,7 @@ func (r *adminManagementRepositoryStub) CategoryIsActive(_ context.Context, _ in
 }
 
 func (r *adminManagementRepositoryStub) Update(_ context.Context, store *model.Store) error {
+	r.updateCalls++
 	r.store = store
 	return nil
 }
@@ -89,6 +96,17 @@ func TestAdminStoreManagementRoutesRequireAdminAndParseFilters(t *testing.T) {
 		w := e.get("/admin/stores", tc.auth)
 		if w.Code != tc.code {
 			t.Errorf("%s: GET /admin/stores got %d %s, want %d", tc.name, w.Code, w.Body.String(), tc.code)
+		}
+		w = e.get("/admin/stores/"+adminStoreTestID, tc.auth)
+		if w.Code != tc.code {
+			t.Errorf("%s: GET /admin/stores/:id got %d %s, want %d", tc.name, w.Code, w.Body.String(), tc.code)
+		}
+		w = e.patch("/admin/stores/"+adminStoreTestID, tc.auth, `{"name":"unauthorized update"}`)
+		if w.Code != tc.code {
+			t.Errorf("%s: PATCH /admin/stores/:id got %d %s, want %d", tc.name, w.Code, w.Body.String(), tc.code)
+		}
+		if repo.updateCalls != 0 {
+			t.Errorf("%s: unauthorized request reached repository update %d times", tc.name, repo.updateCalls)
 		}
 	}
 
@@ -168,5 +186,48 @@ func TestAdminStoreManagementUpdateIgnoresProtectedFields(t *testing.T) {
 	}
 	if result.Status != "approved" || result.AcceptsOrders || result.IsActive {
 		t.Fatalf("approval status and order acceptance were conflated: %+v", result)
+	}
+}
+
+func TestAdminStoreManagementRejectsInvalidUpdatesWithoutPersistence(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "malformed JSON", body: `{"name":`},
+		{name: "wrong JSON type", body: `{"name":123}`},
+		{name: "blank name", body: `{"name":"  "}`},
+		{name: "invalid coordinates", body: `{"location":{"latitude":91,"longitude":51}}`},
+		{name: "invalid working hours", body: `{"working_hours":[{"day_of_week":7,"open_time":"08:00","close_time":"19:00"}]}`},
+		{name: "invalid image", body: `{"images":[{"url":"  ","sort_order":1}]}`},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &adminManagementRepositoryStub{store: &model.Store{
+				ID: 1, PublicID: adminStoreTestID, VendorID: 42, VendorStatus: "approved",
+				OwnerName: "مالک اصلی", Name: "نام قبلی", Biography: "معرفی",
+				City: "تهران", AddressLine: "نشانی", IsActive: true, AcceptsOrders: true,
+				Location:  model.StoreLocation{Latitude: 35.7, Longitude: 51.4},
+				RatingAvg: 4.5, RatingCount: 12, TrustScore: 90, MealsSaved: 30,
+			}}
+			before := *repo.store
+			e := newAdminStoreManagementRouter(t, repo)
+			admin := e.login(t, rbacAdminPhone)
+
+			w := e.patch("/admin/stores/"+adminStoreTestID, "Bearer "+admin.AccessToken, tc.body)
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("PATCH /admin/stores/:id with %s: got %d %s, want 400", tc.name, w.Code, w.Body.String())
+			}
+			if code := decodeError(t, w).Code; code != exception.CodeBadRequest {
+				t.Fatalf("PATCH /admin/stores/:id with %s: got error code %q, want %q", tc.name, code, exception.CodeBadRequest)
+			}
+			if repo.updateCalls != 0 {
+				t.Fatalf("invalid update persisted %d times", repo.updateCalls)
+			}
+			if !reflect.DeepEqual(*repo.store, before) {
+				t.Fatalf("stored profile changed after rejected update:\nbefore: %+v\nafter:  %+v", before, *repo.store)
+			}
+		})
 	}
 }
