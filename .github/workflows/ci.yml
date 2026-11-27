@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - develop
+      - main
   pull_request:
     types:
       - opened
@@ -271,8 +271,8 @@ jobs:
           file: dockerfile
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:develop-${{ github.sha }}
-            ${{ env.IMAGE_NAME }}:develop
+            ${{ env.IMAGE_NAME }}:main-${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:main
           build-args: |
             APP_VERSION=${{ github.sha }}
             VCS_REF=${{ github.sha }}
