@@ -8,7 +8,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	serviceinterface "github.com/tahedig/too-good-to-go/backend/internal/application/service/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/application/dto"
+	"github.com/tahedig/too-good-to-go/backend/internal/bootstrap"
 	middlewareinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware/interface"
 )
 
@@ -51,6 +53,70 @@ type devUserAuth struct {
 // Replace it with a JWT middleware that calls SetUserID.
 func NewDevUserAuth(exists func(ctx context.Context, id int64) (bool, error), enabled bool) middlewareinterface.UserAuth {
 	return &devUserAuth{exists: exists, enabled: enabled}
+}
+
+type hybridUserAuth struct {
+	sessions    serviceinterface.SessionService
+	resolveDBID func(ctx context.Context, publicID string) (int64, error)
+	dev         middlewareinterface.UserAuth
+}
+
+// NewHybridUserAuth authenticates Bearer JWT tokens via SessionService and
+// maps the user's public_id to the numeric users.id expected by catalogue/favorites
+// handlers. When no Authorization header is present, it falls back to dev
+// (X-Dev-User-Id in development, 401/anonymous otherwise).
+func NewHybridUserAuth(
+	sessions serviceinterface.SessionService,
+	resolveDBID func(ctx context.Context, publicID string) (int64, error),
+	dev middlewareinterface.UserAuth,
+) middlewareinterface.UserAuth {
+	return &hybridUserAuth{sessions: sessions, resolveDBID: resolveDBID, dev: dev}
+}
+
+func (a *hybridUserAuth) Optional() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		scheme, raw, ok := strings.Cut(c.GetHeader("Authorization"), " ")
+		raw = strings.TrimSpace(raw)
+		if !ok || !strings.EqualFold(scheme, "Bearer") || raw == "" {
+			a.dev.Optional()(c)
+			return
+		}
+		if a.authenticateJWT(c, raw) {
+			c.Next()
+		}
+	}
+}
+
+func (a *hybridUserAuth) Required() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		scheme, raw, ok := strings.Cut(c.GetHeader("Authorization"), " ")
+		raw = strings.TrimSpace(raw)
+		if !ok || !strings.EqualFold(scheme, "Bearer") || raw == "" {
+			a.dev.Required()(c)
+			return
+		}
+		if a.authenticateJWT(c, raw) {
+			c.Next()
+		}
+	}
+}
+
+func (a *hybridUserAuth) authenticateJWT(c *gin.Context, token string) bool {
+	user, err := a.sessions.Authenticate(c.Request.Context(), token)
+	if err != nil {
+		_ = c.Error(err)
+		c.Abort()
+		return false
+	}
+	dbID, err := a.resolveDBID(c.Request.Context(), user.ID)
+	if err != nil || dbID < 1 {
+		abortUnauthorized(c, "unknown user")
+		return false
+	}
+	c.Set(bootstrap.CtxKeyUserID, user.ID)
+	c.Set(bootstrap.CtxKeyUserRole, string(user.Role))
+	SetUserID(c, dbID)
+	return true
 }
 
 func (a *devUserAuth) Optional() gin.HandlerFunc {

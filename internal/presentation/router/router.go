@@ -107,6 +107,9 @@ func New(
 	if authMW != nil {
 		vendor.Use(authMW.Authenticate(), authMW.RequireRoles(enum.RoleVendor))
 	}
+	if h.UserAuth != nil {
+		vendor.Use(h.UserAuth.Optional())
+	}
 	if h.Store != nil {
 		vendor.GET("/stores", h.Store.ListStores)
 		vendor.GET("/stores/:id", h.Store.GetStore)
