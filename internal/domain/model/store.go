@@ -40,6 +40,7 @@ type Store struct {
 	Biography           string
 	PickupInstructions  string
 	Phone               *string
+	ContactPhone        string
 	City                string
 	District            *string
 	AddressLine         string
@@ -58,6 +59,25 @@ type Store struct {
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 	DeletedAt           *time.Time
+}
+
+// AdminStoreUpdate contains only fields that an admin may edit. Identity,
+// approval state, and computed metrics are deliberately absent.
+type AdminStoreUpdate struct {
+	Name               *string
+	Biography          *string
+	PickupInstructions *string
+	Phone              *string
+	City               *string
+	District           *string
+	AddressLine        *string
+	CategoryID         *int16
+	Location           *StoreLocation
+	LogoURL            *string
+	CoverImageURL      *string
+	WorkingHours       *[]WorkingHour
+	Images             *[]StoreImage
+	AcceptsOrders      *bool
 }
 
 // IsEligibleForPublic returns true if the store can be viewed by public customers.
