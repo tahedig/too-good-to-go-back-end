@@ -310,7 +310,7 @@ func (s *catalogueService) MapOffers(ctx context.Context, q dto.MapQuery) (*dto.
 
 // ---------------------------------------------------------------- favorites
 
-func (s *catalogueService) ListFavorites(ctx context.Context, userID int64, q dto.FavoritesQuery) (*dto.CatalogueOfferList, error) {
+func (s *catalogueService) ListFavorites(ctx context.Context, userPublicID string, q dto.FavoritesQuery) (*dto.CatalogueOfferList, error) {
 	v := &catValidator{}
 	lat, lng := v.latLng(q.Lat, q.Lng)
 	limit := v.limit(q.Limit, catDefaultLimit, catMaxLimit)
@@ -319,7 +319,7 @@ func (s *catalogueService) ListFavorites(ctx context.Context, userID int64, q dt
 		return nil, err
 	}
 	rows, err := s.repo.Favorites(ctx, model.CatalogueFavoritesSearch{
-		UserID: userID, Lat: lat, Lng: lng, Cursor: cur, Limit: limit + 1,
+		UserPublicID: userPublicID, Lat: lat, Lng: lng, Cursor: cur, Limit: limit + 1,
 	})
 	if err != nil {
 		return nil, exception.NewInternalServer(err)
@@ -327,12 +327,12 @@ func (s *catalogueService) ListFavorites(ctx context.Context, userID int64, q dt
 	return s.catalogueList(rows, limit, catCursorScopeFavs), nil
 }
 
-func (s *catalogueService) AddFavorite(ctx context.Context, userID int64, offerPublicID string) (*dto.FavoriteOfferResponse, error) {
+func (s *catalogueService) AddFavorite(ctx context.Context, userPublicID, offerPublicID string) (*dto.FavoriteOfferResponse, error) {
 	id, err := uuid.Parse(strings.TrimSpace(offerPublicID))
 	if err != nil {
 		return nil, exception.NewBadRequest("invalid offer id: must be a UUID", nil)
 	}
-	found, err := s.repo.AddFavorite(ctx, userID, id.String())
+	found, err := s.repo.AddFavorite(ctx, userPublicID, id.String())
 	if err != nil {
 		return nil, exception.NewInternalServer(err)
 	}
@@ -342,12 +342,12 @@ func (s *catalogueService) AddFavorite(ctx context.Context, userID int64, offerP
 	return &dto.FavoriteOfferResponse{OfferID: id.String(), IsFavorite: true}, nil
 }
 
-func (s *catalogueService) RemoveFavorite(ctx context.Context, userID int64, offerPublicID string) error {
+func (s *catalogueService) RemoveFavorite(ctx context.Context, userPublicID, offerPublicID string) error {
 	id, err := uuid.Parse(strings.TrimSpace(offerPublicID))
 	if err != nil {
 		return exception.NewBadRequest("invalid offer id: must be a UUID", nil)
 	}
-	if err := s.repo.RemoveFavorite(ctx, userID, id.String()); err != nil {
+	if err := s.repo.RemoveFavorite(ctx, userPublicID, id.String()); err != nil {
 		return exception.NewInternalServer(err)
 	}
 	return nil

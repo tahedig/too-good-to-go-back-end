@@ -41,11 +41,11 @@ func (f *fakeCatalogueRepo) FilterData(context.Context) (model.CatalogueFilterDa
 	return model.CatalogueFilterData{PriceMin: 40000, PriceMax: 70000, OfferCount: 22,
 		Allergens: []model.CatalogueAllergen{{Code: "gluten", NameFA: "گلوتن"}}}, nil
 }
-func (f *fakeCatalogueRepo) AddFavorite(context.Context, int64, string) (bool, error) {
+func (f *fakeCatalogueRepo) AddFavorite(context.Context, string, string) (bool, error) {
 	return f.addFound, nil
 }
-func (f *fakeCatalogueRepo) RemoveFavorite(context.Context, int64, string) error { return nil }
-func (f *fakeCatalogueRepo) UserExists(context.Context, int64) (bool, error)     { return true, nil }
+func (f *fakeCatalogueRepo) RemoveFavorite(context.Context, string, string) error { return nil }
+func (f *fakeCatalogueRepo) UserExists(context.Context, int64) (bool, error)      { return true, nil }
 func (f *fakeCatalogueRepo) OfferDetail(context.Context, string, *float64, *float64, *int64) (*model.CatalogueOfferDetail, error) {
 	return f.detail, nil
 }
@@ -166,20 +166,21 @@ func TestMapRequiresLocation(t *testing.T) {
 }
 
 func TestFavorites(t *testing.T) {
+	const userPublicID = "550e8400-e29b-41d4-a716-446655440000"
 	repo := &fakeCatalogueRepo{addFound: false}
 	svc := NewCatalogueService(repo)
-	if _, err := svc.AddFavorite(context.Background(), 2, "nope"); err == nil {
+	if _, err := svc.AddFavorite(context.Background(), userPublicID, "nope"); err == nil {
 		t.Fatal("bad uuid must be rejected")
 	}
-	if _, err := svc.AddFavorite(context.Background(), 2, "3f2b8f0e-6c1d-4c53-9a43-0d1d5c7a9e11"); err == nil {
+	if _, err := svc.AddFavorite(context.Background(), userPublicID, "3f2b8f0e-6c1d-4c53-9a43-0d1d5c7a9e11"); err == nil {
 		t.Fatal("unknown offer must be a 404")
 	}
 	repo.addFound = true
-	res, err := svc.AddFavorite(context.Background(), 2, "3f2b8f0e-6c1d-4c53-9a43-0d1d5c7a9e11")
+	res, err := svc.AddFavorite(context.Background(), userPublicID, "3f2b8f0e-6c1d-4c53-9a43-0d1d5c7a9e11")
 	if err != nil || !res.IsFavorite {
 		t.Fatalf("add favorite failed: %v %+v", err, res)
 	}
-	if err := svc.RemoveFavorite(context.Background(), 2, "3f2b8f0e-6c1d-4c53-9a43-0d1d5c7a9e11"); err != nil {
+	if err := svc.RemoveFavorite(context.Background(), userPublicID, "3f2b8f0e-6c1d-4c53-9a43-0d1d5c7a9e11"); err != nil {
 		t.Fatal(err)
 	}
 }

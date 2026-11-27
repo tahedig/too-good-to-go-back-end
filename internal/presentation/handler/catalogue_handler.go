@@ -7,6 +7,7 @@ import (
 
 	"github.com/tahedig/too-good-to-go/backend/internal/application/dto"
 	serviceinterface "github.com/tahedig/too-good-to-go/backend/internal/application/service/interface"
+	"github.com/tahedig/too-good-to-go/backend/internal/bootstrap"
 	handlerinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/handler/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware"
 )
@@ -329,14 +330,14 @@ func (h *catalogueHandler) MapOffers(c *gin.Context) {
 // @Param        lng           query number false "User longitude"
 // @Param        limit         query int    false "Page size" minimum(1) maximum(50) default(20)
 // @Param        cursor        query string false "next_cursor of the previous page"
-// @Param        X-Dev-User-Id header int   true  "DEV auth: users.id"
+// @Security     BearerAuth
 // @Success      200 {object} dto.CatalogueOfferList
 // @Failure      400 {object} dto.ErrorResponse
 // @Failure      401 {object} dto.ErrorResponse
 // @Router       /favorites/offers [get]
 func (h *catalogueHandler) ListFavorites(c *gin.Context) {
-	userID, ok := middleware.UserID(c)
-	if !ok { // Required auth runs first; this is a safety net
+	userID := c.GetString(bootstrap.CtxKeyUserID)
+	if userID == "" {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
@@ -360,15 +361,15 @@ func (h *catalogueHandler) ListFavorites(c *gin.Context) {
 // @Tags         favorites
 // @Produce      json
 // @Param        id            path   string true "Offer public id (UUID)"
-// @Param        X-Dev-User-Id header int    true "DEV auth: users.id"
+// @Security     BearerAuth
 // @Success      200 {object} dto.FavoriteOfferResponse
 // @Failure      400 {object} dto.ErrorResponse
 // @Failure      401 {object} dto.ErrorResponse
 // @Failure      404 {object} dto.ErrorResponse
 // @Router       /favorites/offers/{id} [put]
 func (h *catalogueHandler) AddFavorite(c *gin.Context) {
-	userID, ok := middleware.UserID(c)
-	if !ok {
+	userID := c.GetString(bootstrap.CtxKeyUserID)
+	if userID == "" {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
@@ -385,14 +386,14 @@ func (h *catalogueHandler) AddFavorite(c *gin.Context) {
 // @Description  حذف از علاقه‌مندی. idempotent است و همیشه ۲۰۴ برمی‌گرداند (وجود یا عدم وجود آفر لو نمی‌رود).
 // @Tags         favorites
 // @Param        id            path   string true "Offer public id (UUID)"
-// @Param        X-Dev-User-Id header int    true "DEV auth: users.id"
+// @Security     BearerAuth
 // @Success      204 "No Content"
 // @Failure      400 {object} dto.ErrorResponse
 // @Failure      401 {object} dto.ErrorResponse
 // @Router       /favorites/offers/{id} [delete]
 func (h *catalogueHandler) RemoveFavorite(c *gin.Context) {
-	userID, ok := middleware.UserID(c)
-	if !ok {
+	userID := c.GetString(bootstrap.CtxKeyUserID)
+	if userID == "" {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}

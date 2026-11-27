@@ -28,10 +28,10 @@ type CatalogueSearch struct {
 }
 
 type CatalogueFavoritesSearch struct {
-	UserID   int64
-	Lat, Lng *float64
-	Cursor   *CatalogueCursor
-	Limit    int
+	UserPublicID string
+	Lat, Lng     *float64
+	Cursor       *CatalogueCursor
+	Limit        int
 }
 
 type CatalogueMapSearch struct {

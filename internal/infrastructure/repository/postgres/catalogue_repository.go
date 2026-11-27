@@ -171,22 +171,22 @@ func (r *catalogueRepository) Search(ctx context.Context, p model.CatalogueSearc
 
 func (r *catalogueRepository) Favorites(ctx context.Context, p model.CatalogueFavoritesSearch) ([]model.CatalogueOffer, error) {
 	ck := cursorArgs(p.Cursor, false)
-	// $1 user, $2 lat, $3 lng, $4 cursor key, $5 cursor id, $6 limit
-	rows, err := r.db.Query(ctx, sqlFavoritesList, p.UserID, p.Lat, p.Lng, ck[0], ck[1], p.Limit)
+	// $1 user public ID, $2 lat, $3 lng, $4 cursor key, $5 cursor id, $6 limit
+	rows, err := r.db.Query(ctx, sqlFavoritesList, p.UserPublicID, p.Lat, p.Lng, ck[0], ck[1], p.Limit)
 	if err != nil {
 		return nil, err
 	}
 	return scanCatalogueOffers(rows)
 }
 
-func (r *catalogueRepository) AddFavorite(ctx context.Context, userID int64, offerPublicID string) (bool, error) {
+func (r *catalogueRepository) AddFavorite(ctx context.Context, userPublicID, offerPublicID string) (bool, error) {
 	var found bool
-	err := r.db.QueryRow(ctx, sqlFavoriteAdd, userID, offerPublicID).Scan(&found)
+	err := r.db.QueryRow(ctx, sqlFavoriteAdd, userPublicID, offerPublicID).Scan(&found)
 	return found, err
 }
 
-func (r *catalogueRepository) RemoveFavorite(ctx context.Context, userID int64, offerPublicID string) error {
-	_, err := r.db.Exec(ctx, sqlFavoriteRemove, userID, offerPublicID)
+func (r *catalogueRepository) RemoveFavorite(ctx context.Context, userPublicID, offerPublicID string) error {
+	_, err := r.db.Exec(ctx, sqlFavoriteRemove, userPublicID, offerPublicID)
 	return err
 }
 

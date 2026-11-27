@@ -19,9 +19,9 @@ type CatalogueService interface {
 	Filters(ctx context.Context) (*dto.CatalogueFiltersResponse, error)
 	MapOffers(ctx context.Context, q dto.MapQuery) (*dto.CatalogueMapResponse, error)
 
-	ListFavorites(ctx context.Context, userID int64, q dto.FavoritesQuery) (*dto.CatalogueOfferList, error)
-	AddFavorite(ctx context.Context, userID int64, offerPublicID string) (*dto.FavoriteOfferResponse, error)
-	RemoveFavorite(ctx context.Context, userID int64, offerPublicID string) error
+	ListFavorites(ctx context.Context, userPublicID string, q dto.FavoritesQuery) (*dto.CatalogueOfferList, error)
+	AddFavorite(ctx context.Context, userPublicID, offerPublicID string) (*dto.FavoriteOfferResponse, error)
+	RemoveFavorite(ctx context.Context, userPublicID, offerPublicID string) error
 
 	// UserExists is used by the development auth middleware.
 	UserExists(ctx context.Context, userID int64) (bool, error)
