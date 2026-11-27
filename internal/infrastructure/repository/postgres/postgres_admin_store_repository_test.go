@@ -62,7 +62,9 @@ func newAdminStoreTestPool(t *testing.T) *pgxpool.Pool {
 		"000011_create_store_profile_details.up.sql",
 		"000012_create_store_requests.up.sql",
 		"000013_create_store_status_history.up.sql",
-		"000014_create_store_subscriptions.up.sql",
+		"000014_reservation_checkout_support.up.sql",
+		"000015_create_catalogue_views_and_favorites.up.sql",
+		"000016_create_financial_management.up.sql",
 	}
 	for _, f := range migrations {
 		sqlBytes, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "migrations", f))
@@ -125,16 +127,17 @@ VALUES ($1, 0, '08:00', '19:00', false), ($1, 5, '00:00', '00:00', true)`, store
 
 	// 2. GetStoreSubscription
 	if _, err := pool.Exec(ctx, `
-INSERT INTO store_subscriptions (store_id, plan_id, upgrade_plan_id, status, commission_rate, period_start, period_end)
-VALUES ($1, (SELECT id FROM subscription_plans WHERE code = 'basic_free'), (SELECT id FROM subscription_plans WHERE code = 'pro'),
-        'pending_review', 10.00, now() - interval '27 days', now() + interval '3 days')`, storeDBID); err != nil {
+INSERT INTO vendor_subscriptions (vendor_id, plan_id, status, starts_at, ends_at)
+VALUES ($1, (SELECT id FROM subscription_plans WHERE code = 'basic'),
+        'active', now() - interval '27 days', now() + interval '3 days'),
+       ($1, (SELECT id FROM subscription_plans WHERE code = 'pro'), 'pending_review', NULL, NULL)`, vendorID); err != nil {
 		t.Fatal(err)
 	}
 	sub, err := repo.GetStoreSubscription(ctx, storePublicID)
 	if err != nil {
 		t.Fatalf("GetStoreSubscription: %v", err)
 	}
-	if sub.CurrentPlan != "پایه - رایگان" || sub.UpgradeRequest == nil || *sub.UpgradeRequest != "حرفه‌ای" || sub.RemainingDays < 2 {
+	if sub.Status != "pending_review" || sub.CurrentPlan != "پایه" || sub.UpgradeRequest == nil || *sub.UpgradeRequest != "حرفه‌ای" || sub.RemainingDays < 2 {
 		t.Fatalf("unexpected subscription: %+v", sub)
 	}
 
