@@ -12,6 +12,7 @@ import (
 
 type fakeCatalogueRepo struct {
 	search   []model.CatalogueOffer
+	detail   *model.CatalogueOfferDetail
 	lastSrch model.CatalogueSearch
 	lastHome model.HomeSearch
 	homeCall int
@@ -45,6 +46,9 @@ func (f *fakeCatalogueRepo) AddFavorite(context.Context, int64, string) (bool, e
 }
 func (f *fakeCatalogueRepo) RemoveFavorite(context.Context, int64, string) error { return nil }
 func (f *fakeCatalogueRepo) UserExists(context.Context, int64) (bool, error)     { return true, nil }
+func (f *fakeCatalogueRepo) OfferDetail(context.Context, string, *float64, *float64, *int64) (*model.CatalogueOfferDetail, error) {
+	return f.detail, nil
+}
 
 func catRows(n int) []model.CatalogueOffer {
 	out := make([]model.CatalogueOffer, n)

@@ -195,6 +195,39 @@ func (h *catalogueHandler) SearchOffers(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
+// OfferDetail godoc
+// @Summary      Product / offer details
+// @Description  جزئیات کامل آفر برای صفحه محصول شامل اطلاعات آفر و فروشگاه، قیمت، بازه تحویل، آلرژن‌ها و موجودی فعلی. همان قوانین انتشار و دسترس‌پذیری کاتالوگ اعمال می‌شود.
+// @Tags         offers
+// @Produce      json
+// @Param        id            path   string true  "Offer public id (UUID)"
+// @Param        lat           query  number false "User latitude (fills distance_m and distance_text)"
+// @Param        lng           query  number false "User longitude"
+// @Param        X-Dev-User-Id header int    false "DEV auth: users.id (fills is_favorite)"
+// @Success      200 {object} dto.OfferDetailResponse
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /offers/{id} [get]
+func (h *catalogueHandler) OfferDetail(c *gin.Context) {
+	r := newQueryReader(c)
+	q := dto.OfferDetailQuery{
+		Lat:    r.floatp("lat"),
+		Lng:    r.floatp("lng"),
+		UserID: middleware.UserIDPtr(c),
+	}
+	if err := r.err(); err != nil {
+		abortWithError(c, err)
+		return
+	}
+	res, err := h.svc.OfferDetail(c.Request.Context(), c.Param("id"), q)
+	if err != nil {
+		abortWithError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
 // StoreOffers godoc
 // @Summary      Offers of one store
 // @Description  آفرهای یک فروشگاه با همان فیلترها و cursor کاتالوگ. {id} همان public id فروشگاه است. فروشگاه ناشناس یا غیرفعال لیست خالی می‌دهد.

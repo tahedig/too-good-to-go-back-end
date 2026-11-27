@@ -28,6 +28,7 @@ func registerCatalogue(r *gin.Engine, h Handlers) {
 	offers.GET("", h.Catalogue.SearchOffers)
 	offers.GET("/filters", h.Catalogue.Filters)
 	offers.GET("/map", h.Catalogue.MapOffers)
+	offers.GET("/:id", h.Catalogue.OfferDetail)
 
 	// Same wildcard name (:id) as the existing GET /stores/:id route.
 	r.GET("/stores/:id/offers", optional, h.Catalogue.StoreOffers)

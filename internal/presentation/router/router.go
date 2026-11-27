@@ -30,6 +30,7 @@ type Handlers struct {
 	Catalogue    handlerinterface.CatalogueHandler
 	UserAuth     middlewareinterface.UserAuth
 	Order        handlerinterface.OrderHandler
+	Reservation  handlerinterface.ReservationHandler
 	Profile      handlerinterface.ProfileHandler
 	// VendorApproval serves the admin panel's store review (/admin/vendors).
 	VendorApproval handlerinterface.VendorApprovalHandler
@@ -87,7 +88,7 @@ func New(
 	auth.POST("/request", h.Auth.RequestOTP)
 	auth.POST("/verify", h.Auth.VerifyOTP)
 
-	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil || h.Profile != nil || h.Order != nil || h.VendorApproval != nil) {
+	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil || h.Profile != nil || h.Order != nil || h.Reservation != nil || h.VendorApproval != nil) {
 		// Refuse to start rather than serve private routes unauthenticated.
 		return nil, errors.New("router: auth middleware is required for protected routes")
 	}
@@ -133,6 +134,12 @@ func New(
 	// also buy, and the query is always scoped to the caller.
 	if h.Order != nil {
 		r.GET("/orders", authMW.Authenticate(), h.Order.ListMyOrders)
+	}
+
+	// Customer reservation checkout (TEAM-49).
+	if h.Reservation != nil {
+		reservations := r.Group("/reservations", authMW.Authenticate())
+		reservations.POST("", h.Reservation.CreateReservation)
 	}
 
 	// Admin only: every /admin route needs a valid token with the admin role.

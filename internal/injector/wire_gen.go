@@ -49,6 +49,9 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 	orderRepository := provideOrderRepository(injectorDatabase)
 	orderService := service.NewOrderService(orderRepository)
 	orderHandler := handler.NewOrderHandler(orderService)
+	reservationRepository := provideReservationRepository(injectorDatabase)
+	reservationService := service.NewReservationService(reservationRepository)
+	reservationHandler := handler.NewReservationHandler(reservationService)
 	vendorApprovalRepository := provideVendorApprovalRepository(injectorDatabase)
 	vendorApprovalService := service.NewVendorApprovalService(vendorApprovalRepository, log)
 	vendorApprovalHandler := handler.NewVendorApprovalHandler(vendorApprovalService)
@@ -61,7 +64,7 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 	offerRepository := provideOfferRepository(injectorDatabase)
 	publicStoreService := providePublicStoreService(storeRepository, offerRepository)
 	publicStoreHandler := providePublicStoreHandler(publicStoreService)
-	handlers := provideHandlers(healthHandler, authHandler, catalogueHandler, userAuth, protectedHandler, profileHandler, orderHandler, vendorApprovalHandler, storeHandler, storeRequestHandler, publicStoreHandler)
+	handlers := provideHandlers(healthHandler, authHandler, catalogueHandler, userAuth, protectedHandler, profileHandler, orderHandler, reservationHandler, vendorApprovalHandler, storeHandler, storeRequestHandler, publicStoreHandler)
 	engine, err := router.New(cfg, log, errorHandler, authMiddleware, rateLimiter, handlers)
 	if err != nil {
 		cleanup2()

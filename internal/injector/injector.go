@@ -119,6 +119,7 @@ func provideAuthService(
 type database struct {
 	users         repository.UserRepository
 	orders        repository.OrderRepository
+	reservations  repository.ReservationRepository
 	vendors       repository.VendorApprovalRepository
 	stores        repository.StoreRepository
 	offers        repository.OfferRepository
@@ -136,8 +137,13 @@ const dbConnectTimeout = 5 * time.Second
 func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func(), error) {
 	if cfg.DatabaseURL == "" {
 		log.Warn("DATABASE_URL is not set: users and orders are kept in memory, are lost on restart and are not shared between instances")
-		return &database{users: memory.NewUserRepository(), orders: memory.NewOrderRepository(),
-			vendors: memory.NewVendorApprovalRepository()}, func() {}, nil
+		memOrders := memory.NewOrderRepository()
+		return &database{
+			users:        memory.NewUserRepository(),
+			orders:       memOrders,
+			reservations: memory.NewReservationRepository(memOrders),
+			vendors:      memory.NewVendorApprovalRepository(),
+		}, func() {}, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbConnectTimeout)
@@ -156,6 +162,7 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 	return &database{
 		users:         postgres.NewUserRepository(pool),
 		orders:        postgres.NewOrderRepository(pool),
+		reservations:  postgres.NewReservationRepository(pool),
 		vendors:       postgres.NewVendorApprovalRepository(pool),
 		stores:        postgres.NewStoreRepository(pool),
 		offers:        postgres.NewOfferRepository(pool),
@@ -168,6 +175,10 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 func provideUserRepository(db *database) repository.UserRepository { return db.users }
 
 func provideOrderRepository(db *database) repository.OrderRepository { return db.orders }
+
+func provideReservationRepository(db *database) repository.ReservationRepository {
+	return db.reservations
+}
 
 func provideVendorApprovalRepository(db *database) repository.VendorApprovalRepository {
 	return db.vendors
@@ -257,6 +268,7 @@ func provideHandlers(
 	protected handlerinterface.ProtectedHandler,
 	profile handlerinterface.ProfileHandler,
 	order handlerinterface.OrderHandler,
+	reservation handlerinterface.ReservationHandler,
 	vendorApproval handlerinterface.VendorApprovalHandler,
 	store handlerinterface.StoreHandler,
 	storeRequest handlerinterface.StoreRequestHandler,
@@ -270,6 +282,7 @@ func provideHandlers(
 		Protected:      protected,
 		Profile:        profile,
 		Order:          order,
+		Reservation:    reservation,
 		VendorApproval: vendorApproval,
 		Store:          store,
 		StoreRequest:   storeRequest,
