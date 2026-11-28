@@ -117,16 +117,17 @@ func provideAuthService(
 // database is everything that moves from memory to PostgreSQL when
 // DATABASE_URL is set.
 type database struct {
-	users         repository.UserRepository
-	orders        repository.OrderRepository
-	reservations  repository.ReservationRepository
-	vendors       repository.VendorApprovalRepository
-	adminStores   repository.AdminStoreRepository
-	stores        repository.StoreRepository
-	offers        repository.OfferRepository
-	storeRequests repository.StoreRequestRepository
-	pool          *pgxpool.Pool
-	checkers      []serviceinterface.HealthChecker
+	users           repository.UserRepository
+	orders          repository.OrderRepository
+	reservations    repository.ReservationRepository
+	vendors         repository.VendorApprovalRepository
+	adminStores     repository.AdminStoreRepository
+	storeManagement repository.AdminStoreManagementRepository
+	stores          repository.StoreRepository
+	offers          repository.OfferRepository
+	storeRequests   repository.StoreRequestRepository
+	pool            *pgxpool.Pool
+	checkers        []serviceinterface.HealthChecker
 }
 
 const dbConnectTimeout = 5 * time.Second
@@ -162,16 +163,17 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 	log.Info("connected to postgres", "host", connCfg.Host, "port", connCfg.Port, "database", connCfg.Database)
 
 	return &database{
-		users:         postgres.NewUserRepository(pool),
-		orders:        postgres.NewOrderRepository(pool),
-		reservations:  postgres.NewReservationRepository(pool),
-		vendors:       postgres.NewVendorApprovalRepository(pool),
-		adminStores:   postgres.NewAdminStoreRepository(pool),
-		stores:        postgres.NewStoreRepository(pool),
-		offers:        postgres.NewOfferRepository(pool),
-		storeRequests: postgres.NewStoreRequestRepository(pool),
-		pool:          pool,
-		checkers:      []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
+		users:           postgres.NewUserRepository(pool),
+		orders:          postgres.NewOrderRepository(pool),
+		reservations:    postgres.NewReservationRepository(pool),
+		vendors:         postgres.NewVendorApprovalRepository(pool),
+		adminStores:     postgres.NewAdminStoreRepository(pool),
+		storeManagement: postgres.NewAdminStoreManagementRepository(pool),
+		stores:          postgres.NewStoreRepository(pool),
+		offers:          postgres.NewOfferRepository(pool),
+		storeRequests:   postgres.NewStoreRequestRepository(pool),
+		pool:            pool,
+		checkers:        []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
 	}, pool.Close, nil
 }
 
@@ -189,6 +191,24 @@ func provideVendorApprovalRepository(db *database) repository.VendorApprovalRepo
 
 func provideAdminStoreRepository(db *database) repository.AdminStoreRepository {
 	return db.adminStores
+}
+
+func provideAdminStoreManagementRepository(db *database) repository.AdminStoreManagementRepository {
+	return db.storeManagement
+}
+
+func provideAdminStoreManagementService(repo repository.AdminStoreManagementRepository) serviceinterface.AdminStoreManagementService {
+	if repo == nil {
+		return nil
+	}
+	return service.NewAdminStoreManagementService(repo)
+}
+
+func provideAdminStoreManagementHandler(svc serviceinterface.AdminStoreManagementService) handlerinterface.AdminStoreManagementHandler {
+	if svc == nil {
+		return nil
+	}
+	return handler.NewAdminStoreManagementHandler(svc)
 }
 
 func provideStoreRepository(db *database) repository.StoreRepository { return db.stores }
@@ -278,23 +298,25 @@ func provideHandlers(
 	reservation handlerinterface.ReservationHandler,
 	vendorApproval handlerinterface.VendorApprovalHandler,
 	adminStore handlerinterface.AdminStoreHandler,
+	adminStoreManagement handlerinterface.AdminStoreManagementHandler,
 	store handlerinterface.StoreHandler,
 	storeRequest handlerinterface.StoreRequestHandler,
 	publicStore handlerinterface.PublicStoreHandler,
 ) router.Handlers {
 	return router.Handlers{
-		Health:         health,
-		Auth:           auth,
-		Catalogue:      catalogue,
-		UserAuth:       userAuth,
-		Protected:      protected,
-		Profile:        profile,
-		Order:          order,
-		Reservation:    reservation,
-		VendorApproval: vendorApproval,
-		AdminStore:     adminStore,
-		Store:          store,
-		StoreRequest:   storeRequest,
-		PublicStore:    publicStore,
+		Health:               health,
+		Auth:                 auth,
+		Catalogue:            catalogue,
+		UserAuth:             userAuth,
+		Protected:            protected,
+		Profile:              profile,
+		Order:                order,
+		Reservation:          reservation,
+		VendorApproval:       vendorApproval,
+		AdminStore:           adminStore,
+		AdminStoreManagement: adminStoreManagement,
+		Store:                store,
+		StoreRequest:         storeRequest,
+		PublicStore:          publicStore,
 	}
 }
