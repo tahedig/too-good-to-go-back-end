@@ -98,6 +98,32 @@ func TestDefaultSeedDatasetMeetsRequirements(t *testing.T) {
 			t.Fatalf("missing seeded order for lifecycle status %q", st)
 		}
 	}
+
+	activePerVendor := make(map[int]int)
+	for _, sub := range defaultVendorSubscriptions {
+		if sub.Status == "active" {
+			activePerVendor[sub.VendorIndex]++
+			if activePerVendor[sub.VendorIndex] > 1 {
+				t.Fatalf("vendor %d has multiple active subscriptions", sub.VendorIndex)
+			}
+		}
+	}
+	for _, pr := range defaultPayoutRequests {
+		if _, ok := storesBySlug[pr.StoreSlug]; !ok {
+			t.Fatalf("payout request %s references unknown store %q", pr.PublicID, pr.StoreSlug)
+		}
+		if pr.Amount <= 0 {
+			t.Fatalf("payout request %s amount must be positive", pr.PublicID)
+		}
+	}
+	for _, fav := range defaultFavoriteOffers {
+		if _, ok := offersByID[fav.OfferPublicID]; !ok {
+			t.Fatalf("favorite references unknown offer %s", fav.OfferPublicID)
+		}
+	}
+	if len(defaultStoreRequests) == 0 {
+		t.Fatal("expected at least 1 store request")
+	}
 }
 
 func TestRun_IdempotentIntegration(t *testing.T) {

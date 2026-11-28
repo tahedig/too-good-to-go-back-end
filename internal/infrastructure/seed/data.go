@@ -655,3 +655,162 @@ var defaultOrders = []seedOrder{
 	{PublicID: "33333333-3333-4333-8333-333333333021", IdempotencyKey: "seed-ord-021", QRToken: "seed-qr-021", CustomerIndex: 1, StoreSlug: "seed-iranian-golestan", OfferPublicID: "22222222-2222-4222-8222-222222222021", Quantity: 1, Status: enum.OrderStatusExpired, PickupCode: "6002", ReservedOffset: -3 * time.Hour, CreatedOffset: -4 * time.Hour},
 	{PublicID: "33333333-3333-4333-8333-333333333022", IdempotencyKey: "seed-ord-022", QRToken: "seed-qr-022", CustomerIndex: 1, StoreSlug: "seed-pizza-araz", OfferPublicID: "22222222-2222-4222-8222-222222222006", Quantity: 1, Status: enum.OrderStatusNoShow, PickupCode: "7001", ReservedOffset: -36 * time.Hour, CreatedOffset: -37 * time.Hour, WithPayment: true},
 }
+
+type seedVendorSubscription struct {
+	PublicID    string
+	VendorIndex int
+	PlanCode    string
+	Status      string
+	PricePaid   int64
+	StartOffset time.Duration
+	EndOffset   time.Duration
+	ReviewNote  string
+}
+
+type seedPayoutRequest struct {
+	PublicID        string
+	VendorIndex     int
+	StoreSlug       string
+	Amount          int64
+	Status          string
+	IBAN            string
+	BankReference   string
+	RejectionReason string
+	CreatedOffset   time.Duration
+}
+
+type seedStoreRequest struct {
+	PublicID    string
+	VendorIndex int
+	StoreName   string
+	OwnerName   string
+	CategoryID  int16
+	Address     string
+	Status      string
+}
+
+type seedFavoriteOffer struct {
+	CustomerIndex int
+	OfferPublicID string
+}
+
+var defaultVendorSubscriptions = []seedVendorSubscription{
+	{
+		PublicID:    "55555555-5555-4555-8555-555555555001",
+		VendorIndex: 0,
+		PlanCode:    "basic",
+		Status:      "expired",
+		PricePaid:   0,
+		StartOffset: -60 * 24 * time.Hour,
+		EndOffset:   -30 * 24 * time.Hour,
+		ReviewNote:  "دوره آزمایشی رایگان اولیه",
+	},
+	{
+		PublicID:    "55555555-5555-4555-8555-555555555002",
+		VendorIndex: 0,
+		PlanCode:    "pro",
+		Status:      "active",
+		PricePaid:   490000,
+		StartOffset: -15 * 24 * time.Hour,
+		EndOffset:   15 * 24 * time.Hour,
+		ReviewNote:  "ارتقا به پلن حرفه‌ای تایید شد",
+	},
+	{
+		PublicID:    "55555555-5555-4555-8555-555555555003",
+		VendorIndex: 1,
+		PlanCode:    "enterprise",
+		Status:      "active",
+		PricePaid:   990000,
+		StartOffset: -10 * 24 * time.Hour,
+		EndOffset:   20 * 24 * time.Hour,
+		ReviewNote:  "اشتراک ویژه چندفروشگاهی تایید شد",
+	},
+	{
+		PublicID:    "55555555-5555-4555-8555-555555555004",
+		VendorIndex: 1,
+		PlanCode:    "pro",
+		Status:      "pending_review",
+		PricePaid:   490000,
+		StartOffset: 0,
+		EndOffset:   30 * 24 * time.Hour,
+	},
+}
+
+var defaultPayoutRequests = []seedPayoutRequest{
+	{
+		PublicID:      "66666666-6666-4666-8666-666666666001",
+		VendorIndex:   0,
+		StoreSlug:     "seed-bakery-valiasr",
+		Amount:        1250000,
+		Status:        "paid",
+		IBAN:          "IR820540102680020817909002",
+		BankReference: "TXN-SEED-001",
+		CreatedOffset: -5 * 24 * time.Hour,
+	},
+	{
+		PublicID:      "66666666-6666-4666-8666-666666666002",
+		VendorIndex:   0,
+		StoreSlug:     "seed-pizza-araz",
+		Amount:        680000,
+		Status:        "pending",
+		IBAN:          "IR820540102680020817909002",
+		CreatedOffset: -6 * time.Hour,
+	},
+	{
+		PublicID:      "66666666-6666-4666-8666-666666666003",
+		VendorIndex:   1,
+		StoreSlug:     "seed-cafe-roshd",
+		Amount:        920000,
+		Status:        "approved",
+		IBAN:          "IR140170000000112233445566",
+		CreatedOffset: -24 * time.Hour,
+	},
+	{
+		PublicID:        "66666666-6666-4666-8666-666666666004",
+		VendorIndex:     1,
+		StoreSlug:       "seed-supermarket-sabz",
+		Amount:          450000,
+		Status:          "rejected",
+		IBAN:            "IR140170000000112233445566",
+		RejectionReason: "شماره شبا با نام صاحب امتیاز فروشگاه مطابقت ندارد.",
+		CreatedOffset:   -72 * time.Hour,
+	},
+}
+
+var defaultStoreRequests = []seedStoreRequest{
+	{
+		PublicID:    "77777777-7777-4777-8777-777777777001",
+		VendorIndex: 0,
+		StoreName:   "نانوایی ولیعصر - شعبه جردن",
+		OwnerName:   "علی رضایی",
+		CategoryID:  1,
+		Address:     "تهران، بلوار نلسون ماندلا، نبش کوچه آرش، پلاک ۳۲",
+		Status:      "pending_review",
+	},
+	{
+		PublicID:    "77777777-7777-4777-8777-777777777002",
+		VendorIndex: 1,
+		StoreName:   "کافه و پیستری رشد",
+		OwnerName:   "مریم کریمی",
+		CategoryID:  3,
+		Address:     "تهران، خیابان شریعتی، بالاتر از میرداماد، پلاک ۱۸",
+		Status:      "approved",
+	},
+	{
+		PublicID:    "77777777-7777-4777-8777-777777777003",
+		VendorIndex: 1,
+		StoreName:   "غذاخوری آزمایشی",
+		OwnerName:   "مریم کریمی",
+		CategoryID:  4,
+		Address:     "تهران، خیابان انقلاب، پلاک ۵",
+		Status:      "rejected",
+	},
+}
+
+var defaultFavoriteOffers = []seedFavoriteOffer{
+	{CustomerIndex: 0, OfferPublicID: "22222222-2222-4222-8222-222222222001"},
+	{CustomerIndex: 0, OfferPublicID: "22222222-2222-4222-8222-222222222006"},
+	{CustomerIndex: 0, OfferPublicID: "22222222-2222-4222-8222-222222222010"},
+	{CustomerIndex: 1, OfferPublicID: "22222222-2222-4222-8222-222222222002"},
+	{CustomerIndex: 1, OfferPublicID: "22222222-2222-4222-8222-222222222011"},
+}

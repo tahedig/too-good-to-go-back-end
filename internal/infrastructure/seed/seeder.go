@@ -17,12 +17,16 @@ import (
 
 // Summary reports the counts of seeded records after a Run.
 type Summary struct {
-	AdminUsers    int
-	VendorUsers   int
-	CustomerUsers int
-	Stores        int
-	Offers        int
-	Orders        int
+	AdminUsers          int
+	VendorUsers         int
+	CustomerUsers       int
+	Stores              int
+	Offers              int
+	Orders              int
+	VendorSubscriptions int
+	PayoutRequests      int
+	StoreRequests       int
+	FavoriteOffers      int
 }
 
 // Run seeds demo accounts, vendor profiles, stores, offers, and reservations
@@ -72,6 +76,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Summary, error) 
 		summary.AdminUsers = 1
 
 		vendorIDs := make([]int64, len(vendorPhones))
+		vendorUserIDs := make([]int64, len(vendorPhones))
 		vendorNames := []string{"فروشنده اول دمو (علی رضایی)", "فروشنده دوم دمو (مریم کریمی)"}
 		businessNames := []string{"گروه غذایی ولیعصر", "هلدینگ کافه و سلامت رشد"}
 		for i, phone := range vendorPhones {
@@ -92,6 +97,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Summary, error) 
 				return fmt.Errorf("seed vendor %d: %w", i, err)
 			}
 			vendorIDs[i] = vid
+			vendorUserIDs[i] = uid
 		}
 		summary.VendorUsers = len(vendorIDs)
 
@@ -162,6 +168,46 @@ func Run(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Summary, error) 
 			}
 		}
 		summary.Orders = len(defaultOrders)
+
+		for _, sub := range defaultVendorSubscriptions {
+			vid := vendorIDs[sub.VendorIndex%len(vendorIDs)]
+			if err := ensureVendorSubscription(ctx, tx, sub, vid, adminID, now); err != nil {
+				return fmt.Errorf("seed vendor subscription %s: %w", sub.PublicID, err)
+			}
+		}
+		summary.VendorSubscriptions = len(defaultVendorSubscriptions)
+
+		for _, pr := range defaultPayoutRequests {
+			idx := pr.VendorIndex % len(vendorIDs)
+			sid, ok := storeIDs[pr.StoreSlug]
+			if !ok {
+				return fmt.Errorf("unknown store slug %q for payout request %s", pr.StoreSlug, pr.PublicID)
+			}
+			if err := ensurePayoutRequest(ctx, tx, pr, vendorIDs[idx], sid, vendorUserIDs[idx], adminID, now); err != nil {
+				return fmt.Errorf("seed payout request %s: %w", pr.PublicID, err)
+			}
+		}
+		summary.PayoutRequests = len(defaultPayoutRequests)
+
+		for _, sr := range defaultStoreRequests {
+			vid := vendorIDs[sr.VendorIndex%len(vendorIDs)]
+			if err := ensureStoreRequest(ctx, tx, sr, vid); err != nil {
+				return fmt.Errorf("seed store request %s: %w", sr.PublicID, err)
+			}
+		}
+		summary.StoreRequests = len(defaultStoreRequests)
+
+		for _, fav := range defaultFavoriteOffers {
+			cid := customerIDs[fav.CustomerIndex%len(customerIDs)]
+			om, ok := offerMetas[fav.OfferPublicID]
+			if !ok {
+				return fmt.Errorf("unknown offer %q for favorite", fav.OfferPublicID)
+			}
+			if err := ensureFavoriteOffer(ctx, tx, cid, om.id); err != nil {
+				return fmt.Errorf("seed favorite offer %s: %w", fav.OfferPublicID, err)
+			}
+		}
+		summary.FavoriteOffers = len(defaultFavoriteOffers)
 
 		return nil
 	})
@@ -490,4 +536,114 @@ func ensureOrder(
 	}
 
 	return nil
+}
+
+func ensureVendorSubscription(
+	ctx context.Context,
+	tx pgx.Tx,
+	sub seedVendorSubscription,
+	vendorID, adminID int64,
+	now time.Time,
+) error {
+	var planID int16
+	if err := tx.QueryRow(ctx, `SELECT id FROM subscription_plans WHERE code = $1`, sub.PlanCode).Scan(&planID); err != nil {
+		return fmt.Errorf("lookup subscription plan %q: %w", sub.PlanCode, err)
+	}
+
+	var startsAt, endsAt, reviewedAt *time.Time
+	var reviewedBy *int64
+	var reviewNote *string
+	if sub.Status != "pending_review" {
+		s := now.Add(sub.StartOffset)
+		e := now.Add(sub.EndOffset)
+		r := s
+		startsAt, endsAt, reviewedAt = &s, &e, &r
+		reviewedBy = &adminID
+	}
+	if sub.ReviewNote != "" {
+		rn := sub.ReviewNote
+		reviewNote = &rn
+	}
+
+	_, err := tx.Exec(ctx, `
+		INSERT INTO vendor_subscriptions (
+			public_id, vendor_id, plan_id, status, price_paid,
+			starts_at, ends_at, reviewed_by, reviewed_at, review_note
+		) VALUES (
+			$1::uuid, $2, $3, $4::subscription_status, $5,
+			$6, $7, $8, $9, $10
+		)
+		ON CONFLICT (public_id) DO NOTHING`,
+		sub.PublicID, vendorID, planID, sub.Status, sub.PricePaid,
+		startsAt, endsAt, reviewedBy, reviewedAt, reviewNote,
+	)
+	return err
+}
+
+func ensurePayoutRequest(
+	ctx context.Context,
+	tx pgx.Tx,
+	pr seedPayoutRequest,
+	vendorID, storeID, requestedBy, adminID int64,
+	now time.Time,
+) error {
+	createdAt := now.Add(pr.CreatedOffset)
+	var reviewedBy *int64
+	var reviewedAt, paidAt *time.Time
+	var bankRef, rejectionReason *string
+
+	if pr.Status != "pending" {
+		reviewedBy = &adminID
+		rt := createdAt.Add(2 * time.Hour)
+		reviewedAt = &rt
+	}
+	if pr.Status == "paid" {
+		pt := createdAt.Add(4 * time.Hour)
+		paidAt = &pt
+	}
+	if pr.BankReference != "" {
+		br := pr.BankReference
+		bankRef = &br
+	}
+	if pr.RejectionReason != "" {
+		rr := pr.RejectionReason
+		rejectionReason = &rr
+	}
+
+	_, err := tx.Exec(ctx, `
+		INSERT INTO payout_requests (
+			public_id, vendor_id, store_id, amount, status, iban, bank_reference,
+			requested_by, reviewed_by, reviewed_at, paid_at, rejection_reason, created_at
+		) VALUES (
+			$1::uuid, $2, $3, $4, $5::payout_status, $6, $7,
+			$8, $9, $10, $11, $12, $13
+		)
+		ON CONFLICT (public_id) DO NOTHING`,
+		pr.PublicID, vendorID, storeID, pr.Amount, pr.Status, pr.IBAN, bankRef,
+		requestedBy, reviewedBy, reviewedAt, paidAt, rejectionReason, createdAt,
+	)
+	return err
+}
+
+func ensureStoreRequest(ctx context.Context, tx pgx.Tx, sr seedStoreRequest, vendorID int64) error {
+	_, err := tx.Exec(ctx, `
+		INSERT INTO store_requests (
+			public_id, vendor_id, store_name, owner_name, category_id, address, status
+		) VALUES (
+			$1::uuid, $2, $3, $4, $5, $6, $7::store_request_status
+		)
+		ON CONFLICT (public_id) DO NOTHING`,
+		sr.PublicID, vendorID, sr.StoreName, sr.OwnerName, sr.CategoryID, sr.Address, sr.Status,
+	)
+	return err
+}
+
+func ensureFavoriteOffer(ctx context.Context, tx pgx.Tx, userID, offerID int64) error {
+	_, err := tx.Exec(ctx, `
+		INSERT INTO favorite_offers (user_id, offer_id)
+		VALUES ($1, $2)
+		ON CONFLICT (user_id, offer_id) DO NOTHING`,
+		userID, offerID,
+	)
+	return err
 }

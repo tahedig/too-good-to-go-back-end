@@ -63,6 +63,10 @@ func run() error {
 		"stores", summary.Stores,
 		"offers", summary.Offers,
 		"orders", summary.Orders,
+		"vendor_subscriptions", summary.VendorSubscriptions,
+		"payout_requests", summary.PayoutRequests,
+		"store_requests", summary.StoreRequests,
+		"favorite_offers", summary.FavoriteOffers,
 	)
 	return nil
 }
