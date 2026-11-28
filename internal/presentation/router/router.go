@@ -35,7 +35,8 @@ type Handlers struct {
 	// VendorApproval serves the admin panel's store review (/admin/vendors).
 	VendorApproval handlerinterface.VendorApprovalHandler
 	// AdminStore serves the admin panel's store details (/admin/stores).
-	AdminStore handlerinterface.AdminStoreHandler
+	AdminStore           handlerinterface.AdminStoreHandler
+	AdminStoreManagement handlerinterface.AdminStoreManagementHandler
 }
 
 func New(
@@ -90,7 +91,7 @@ func New(
 	auth.POST("/request", h.Auth.RequestOTP)
 	auth.POST("/verify", h.Auth.VerifyOTP)
 
-	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil || h.Profile != nil || h.Order != nil || h.Reservation != nil || h.VendorApproval != nil || h.AdminStore != nil) {
+	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil || h.Profile != nil || h.Order != nil || h.Reservation != nil || h.VendorApproval != nil || h.AdminStore != nil || h.AdminStoreManagement != nil) {
 		// Refuse to start rather than serve private routes unauthenticated.
 		return nil, errors.New("router: auth middleware is required for protected routes")
 	}
@@ -142,7 +143,7 @@ func New(
 	}
 
 	// Admin only: every /admin route needs a valid token with the admin role.
-	if h.VendorApproval != nil || h.AdminStore != nil {
+	if h.VendorApproval != nil || h.AdminStore != nil || h.AdminStoreManagement != nil {
 		admin := r.Group("/admin", authMW.Authenticate(), authMW.RequireRoles(enum.RoleAdmin))
 		if h.VendorApproval != nil {
 			admin.GET("/vendors", h.VendorApproval.ListVendors)
@@ -152,8 +153,14 @@ func New(
 			admin.POST("/vendors/:id/suspend", h.VendorApproval.Suspend)
 			admin.POST("/vendors/:id/reactivate", h.VendorApproval.Reactivate)
 		}
-		if h.AdminStore != nil {
+		if h.AdminStoreManagement != nil {
+			admin.GET("/stores", h.AdminStoreManagement.ListStores)
+			admin.GET("/stores/:id", h.AdminStoreManagement.GetManagedStore)
+			admin.PATCH("/stores/:id", h.AdminStoreManagement.UpdateManagedStore)
+		} else if h.AdminStore != nil {
 			admin.GET("/stores/:id", h.AdminStore.GetStore)
+		}
+		if h.AdminStore != nil {
 			admin.PATCH("/stores/:id/status", h.AdminStore.UpdateStoreStatus)
 			admin.GET("/stores/:id/subscription", h.AdminStore.GetSubscription)
 			admin.GET("/stores/:id/offers", h.AdminStore.ListOffers)
