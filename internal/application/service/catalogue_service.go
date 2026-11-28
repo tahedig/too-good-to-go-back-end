@@ -43,6 +43,8 @@ const (
 	catKindBakery       = "bakery"
 	catKindReadyMeal    = "ready_meal"
 	catKindGrocery      = "grocery"
+
+	defaultCancellationCutoff = 2 * time.Hour
 )
 
 var catAllergenCodes = []string{"gluten", "dairy", "egg", "peanut", "nuts", "soy", "fish", "shellfish", "sesame"}
@@ -308,7 +310,7 @@ func (s *catalogueService) MapOffers(ctx context.Context, q dto.MapQuery) (*dto.
 
 // ---------------------------------------------------------------- favorites
 
-func (s *catalogueService) ListFavorites(ctx context.Context, userID int64, q dto.FavoritesQuery) (*dto.CatalogueOfferList, error) {
+func (s *catalogueService) ListFavorites(ctx context.Context, userPublicID string, q dto.FavoritesQuery) (*dto.CatalogueOfferList, error) {
 	v := &catValidator{}
 	lat, lng := v.latLng(q.Lat, q.Lng)
 	limit := v.limit(q.Limit, catDefaultLimit, catMaxLimit)
@@ -317,7 +319,7 @@ func (s *catalogueService) ListFavorites(ctx context.Context, userID int64, q dt
 		return nil, err
 	}
 	rows, err := s.repo.Favorites(ctx, model.CatalogueFavoritesSearch{
-		UserID: userID, Lat: lat, Lng: lng, Cursor: cur, Limit: limit + 1,
+		UserPublicID: userPublicID, Lat: lat, Lng: lng, Cursor: cur, Limit: limit + 1,
 	})
 	if err != nil {
 		return nil, exception.NewInternalServer(err)
@@ -325,12 +327,12 @@ func (s *catalogueService) ListFavorites(ctx context.Context, userID int64, q dt
 	return s.catalogueList(rows, limit, catCursorScopeFavs), nil
 }
 
-func (s *catalogueService) AddFavorite(ctx context.Context, userID int64, offerPublicID string) (*dto.FavoriteOfferResponse, error) {
+func (s *catalogueService) AddFavorite(ctx context.Context, userPublicID, offerPublicID string) (*dto.FavoriteOfferResponse, error) {
 	id, err := uuid.Parse(strings.TrimSpace(offerPublicID))
 	if err != nil {
 		return nil, exception.NewBadRequest("invalid offer id: must be a UUID", nil)
 	}
-	found, err := s.repo.AddFavorite(ctx, userID, id.String())
+	found, err := s.repo.AddFavorite(ctx, userPublicID, id.String())
 	if err != nil {
 		return nil, exception.NewInternalServer(err)
 	}
@@ -340,12 +342,12 @@ func (s *catalogueService) AddFavorite(ctx context.Context, userID int64, offerP
 	return &dto.FavoriteOfferResponse{OfferID: id.String(), IsFavorite: true}, nil
 }
 
-func (s *catalogueService) RemoveFavorite(ctx context.Context, userID int64, offerPublicID string) error {
+func (s *catalogueService) RemoveFavorite(ctx context.Context, userPublicID, offerPublicID string) error {
 	id, err := uuid.Parse(strings.TrimSpace(offerPublicID))
 	if err != nil {
 		return exception.NewBadRequest("invalid offer id: must be a UUID", nil)
 	}
-	if err := s.repo.RemoveFavorite(ctx, userID, id.String()); err != nil {
+	if err := s.repo.RemoveFavorite(ctx, userPublicID, id.String()); err != nil {
 		return exception.NewInternalServer(err)
 	}
 	return nil
@@ -357,6 +359,88 @@ func (s *catalogueService) UserExists(ctx context.Context, userID int64) (bool, 
 		return false, exception.NewInternalServer(err)
 	}
 	return ok, nil
+}
+
+// ---------------------------------------------------------------- product details (TEAM-47)
+
+func (s *catalogueService) OfferDetail(ctx context.Context, offerPublicID string, q dto.OfferDetailQuery) (*dto.OfferDetailResponse, error) {
+	v := &catValidator{}
+	id, parseErr := uuid.Parse(strings.TrimSpace(offerPublicID))
+	if parseErr != nil {
+		v.add("id", "must be a valid UUID")
+	}
+	lat, lng := v.latLng(q.Lat, q.Lng)
+	if err := v.err(); err != nil {
+		return nil, err
+	}
+
+	row, err := s.repo.OfferDetail(ctx, id.String(), lat, lng, q.UserID)
+	if err != nil {
+		return nil, exception.NewInternalServer(err)
+	}
+	if row == nil {
+		return nil, exception.NewNotFound("offer not found")
+	}
+
+	allergens := make([]dto.FilterOption, 0, len(row.Allergens))
+	for _, a := range row.Allergens {
+		allergens = append(allergens, dto.FilterOption{Value: a.Code, Label: a.NameFA})
+	}
+
+	now := s.now()
+	return &dto.OfferDetailResponse{
+		ID:                   row.PublicID,
+		Title:                row.Title,
+		Description:          row.Description,
+		ImageURL:             row.ImageURL,
+		Price:                row.Price,
+		OriginalPrice:        row.OriginalPrice,
+		DiscountPercent:      row.DiscountPercent,
+		Currency:             row.Currency,
+		QuantityAvailable:    row.QuantityAvailable,
+		AvailabilityBadge:    availabilityBadge(row.QuantityAvailable),
+		PickupStart:          row.PickupStart,
+		PickupEnd:            row.PickupEnd,
+		PickupWindow:         pickupWindowText(row.PickupStart, row.PickupEnd, now),
+		CancellationDeadline: resolveCancellationDeadline(row.CancellationDeadline, row.PickupStart),
+		CategorySlug:         row.CategorySlug,
+		CategoryName:         row.CategoryName,
+		Allergens:            allergens,
+		AllergensDeclared:    row.AllergensDeclared,
+		DistanceM:            row.DistanceM,
+		DistanceText:         distanceText(row.DistanceM),
+		Store: dto.OfferDetailStore{
+			ID:                 row.StorePublicID,
+			Name:               row.StoreName,
+			LogoURL:            row.StoreLogoURL,
+			City:               row.StoreCity,
+			District:           row.StoreDistrict,
+			Address:            joinPersianAddress(row.StoreCity, row.StoreAddressLine),
+			PickupInstructions: row.StorePickupInstructions,
+			Location:           dto.StoreLocationResponse{Latitude: row.StoreLat, Longitude: row.StoreLng},
+		},
+		IsFavorite: row.IsFavorite,
+	}, nil
+}
+
+func resolveCancellationDeadline(explicit *time.Time, pickupStart time.Time) time.Time {
+	if explicit != nil {
+		return explicit.UTC()
+	}
+	return pickupStart.UTC().Add(-defaultCancellationCutoff)
+}
+
+func joinPersianAddress(city, line string) string {
+	city = strings.TrimSpace(city)
+	line = strings.TrimSpace(line)
+	switch {
+	case city == "":
+		return line
+	case line == "":
+		return city
+	default:
+		return city + "، " + line
+	}
 }
 
 // ---------------------------------------------------------------- validation

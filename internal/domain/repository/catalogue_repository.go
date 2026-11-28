@@ -15,11 +15,13 @@ type CatalogueRepository interface {
 	Home(ctx context.Context, section model.HomeSection, p model.HomeSearch) ([]model.HomeOffer, error)
 	Map(ctx context.Context, p model.CatalogueMapSearch) ([]model.MapOffer, error)
 	FilterData(ctx context.Context) (model.CatalogueFilterData, error)
+	// OfferDetail returns a single eligible offer with store and food details, or nil when not visible.
+	OfferDetail(ctx context.Context, offerPublicID string, lat, lng *float64, userID *int64) (*model.CatalogueOfferDetail, error)
 
 	// AddFavorite is idempotent. found=false means the offer is not visible to customers.
-	AddFavorite(ctx context.Context, userID int64, offerPublicID string) (found bool, err error)
+	AddFavorite(ctx context.Context, userPublicID, offerPublicID string) (found bool, err error)
 	// RemoveFavorite is idempotent and never reveals whether the offer exists.
-	RemoveFavorite(ctx context.Context, userID int64, offerPublicID string) error
+	RemoveFavorite(ctx context.Context, userPublicID, offerPublicID string) error
 
 	UserExists(ctx context.Context, userID int64) (bool, error)
 }

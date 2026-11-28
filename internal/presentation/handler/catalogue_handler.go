@@ -7,6 +7,7 @@ import (
 
 	"github.com/tahedig/too-good-to-go/backend/internal/application/dto"
 	serviceinterface "github.com/tahedig/too-good-to-go/backend/internal/application/service/interface"
+	"github.com/tahedig/too-good-to-go/backend/internal/bootstrap"
 	handlerinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/handler/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware"
 )
@@ -195,6 +196,39 @@ func (h *catalogueHandler) SearchOffers(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
+// OfferDetail godoc
+// @Summary      Product / offer details
+// @Description  جزئیات کامل آفر برای صفحه محصول شامل اطلاعات آفر و فروشگاه، قیمت، بازه تحویل، آلرژن‌ها و موجودی فعلی. همان قوانین انتشار و دسترس‌پذیری کاتالوگ اعمال می‌شود.
+// @Tags         offers
+// @Produce      json
+// @Param        id            path   string true  "Offer public id (UUID)"
+// @Param        lat           query  number false "User latitude (fills distance_m and distance_text)"
+// @Param        lng           query  number false "User longitude"
+// @Param        X-Dev-User-Id header int    false "DEV auth: users.id (fills is_favorite)"
+// @Success      200 {object} dto.OfferDetailResponse
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /offers/{id} [get]
+func (h *catalogueHandler) OfferDetail(c *gin.Context) {
+	r := newQueryReader(c)
+	q := dto.OfferDetailQuery{
+		Lat:    r.floatp("lat"),
+		Lng:    r.floatp("lng"),
+		UserID: middleware.UserIDPtr(c),
+	}
+	if err := r.err(); err != nil {
+		abortWithError(c, err)
+		return
+	}
+	res, err := h.svc.OfferDetail(c.Request.Context(), c.Param("id"), q)
+	if err != nil {
+		abortWithError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
 // StoreOffers godoc
 // @Summary      Offers of one store
 // @Description  آفرهای یک فروشگاه با همان فیلترها و cursor کاتالوگ. {id} همان public id فروشگاه است. فروشگاه ناشناس یا غیرفعال لیست خالی می‌دهد.
@@ -296,14 +330,14 @@ func (h *catalogueHandler) MapOffers(c *gin.Context) {
 // @Param        lng           query number false "User longitude"
 // @Param        limit         query int    false "Page size" minimum(1) maximum(50) default(20)
 // @Param        cursor        query string false "next_cursor of the previous page"
-// @Param        X-Dev-User-Id header int   true  "DEV auth: users.id"
+// @Security     BearerAuth
 // @Success      200 {object} dto.CatalogueOfferList
 // @Failure      400 {object} dto.ErrorResponse
 // @Failure      401 {object} dto.ErrorResponse
 // @Router       /favorites/offers [get]
 func (h *catalogueHandler) ListFavorites(c *gin.Context) {
-	userID, ok := middleware.UserID(c)
-	if !ok { // Required auth runs first; this is a safety net
+	userID := c.GetString(bootstrap.CtxKeyUserID)
+	if userID == "" {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
@@ -327,15 +361,15 @@ func (h *catalogueHandler) ListFavorites(c *gin.Context) {
 // @Tags         favorites
 // @Produce      json
 // @Param        id            path   string true "Offer public id (UUID)"
-// @Param        X-Dev-User-Id header int    true "DEV auth: users.id"
+// @Security     BearerAuth
 // @Success      200 {object} dto.FavoriteOfferResponse
 // @Failure      400 {object} dto.ErrorResponse
 // @Failure      401 {object} dto.ErrorResponse
 // @Failure      404 {object} dto.ErrorResponse
 // @Router       /favorites/offers/{id} [put]
 func (h *catalogueHandler) AddFavorite(c *gin.Context) {
-	userID, ok := middleware.UserID(c)
-	if !ok {
+	userID := c.GetString(bootstrap.CtxKeyUserID)
+	if userID == "" {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
@@ -352,14 +386,14 @@ func (h *catalogueHandler) AddFavorite(c *gin.Context) {
 // @Description  حذف از علاقه‌مندی. idempotent است و همیشه ۲۰۴ برمی‌گرداند (وجود یا عدم وجود آفر لو نمی‌رود).
 // @Tags         favorites
 // @Param        id            path   string true "Offer public id (UUID)"
-// @Param        X-Dev-User-Id header int    true "DEV auth: users.id"
+// @Security     BearerAuth
 // @Success      204 "No Content"
 // @Failure      400 {object} dto.ErrorResponse
 // @Failure      401 {object} dto.ErrorResponse
 // @Router       /favorites/offers/{id} [delete]
 func (h *catalogueHandler) RemoveFavorite(c *gin.Context) {
-	userID, ok := middleware.UserID(c)
-	if !ok {
+	userID := c.GetString(bootstrap.CtxKeyUserID)
+	if userID == "" {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
