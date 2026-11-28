@@ -122,6 +122,28 @@ func New(
 		vendor.GET("/store-requests/:id", h.StoreRequest.GetStoreRequest)
 		vendor.POST("/store-requests", h.StoreRequest.CreateStoreRequest)
 	}
+	if h.Order != nil {
+		vendor.GET("/store", h.Order.GetVendorStore)
+		vendor.GET("/orders", h.Order.ListVendorOrders)
+		vendor.GET("/orders/summary", h.Order.GetVendorOrderSummary)
+		vendor.GET("/orders/:id", h.Order.GetVendorOrder)
+		vendor.POST("/orders/:id/verify-pickup", h.Order.VerifyPickup)
+		vendor.PATCH("/orders/:id/status", h.Order.UpdateVendorOrderStatus)
+	}
+
+	// Mirror under /api/v1/vendor for frontend api client compatibility.
+	apiV1Vendor := r.Group("/api/v1/vendor")
+	if authMW != nil {
+		apiV1Vendor.Use(authMW.Authenticate(), authMW.RequireRoles(enum.RoleVendor))
+	}
+	if h.Order != nil {
+		apiV1Vendor.GET("/store", h.Order.GetVendorStore)
+		apiV1Vendor.GET("/orders", h.Order.ListVendorOrders)
+		apiV1Vendor.GET("/orders/summary", h.Order.GetVendorOrderSummary)
+		apiV1Vendor.GET("/orders/:id", h.Order.GetVendorOrder)
+		apiV1Vendor.POST("/orders/:id/verify-pickup", h.Order.VerifyPickup)
+		apiV1Vendor.PATCH("/orders/:id/status", h.Order.UpdateVendorOrderStatus)
+	}
 
 	if h.Profile != nil {
 		customer := r.Group("/customer")
