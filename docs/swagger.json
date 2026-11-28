@@ -8,6 +8,69 @@
     },
     "basePath": "/",
     "paths": {
+        "/admin/dashboard": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns admin-only platform totals for customers, vendors, stores, active offers, reservations, platform commission, application status breakdown, reservation status breakdown, and a concise recent-activity feed.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Admin dashboard summary",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of recent-activity items, 1-50 (default 10)",
+                        "name": "activity_limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated filter: store_application, store_decision, reservation",
+                        "name": "activity_type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AdminDashboardResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: invalid activity_limit or activity_type",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN: not an admin",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/offers/{offerId}": {
             "get": {
                 "security": [
@@ -3220,6 +3283,130 @@
         }
     },
     "definitions": {
+        "dto.AdminActivityItemResponse": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "example": "approve"
+                },
+                "actor_name": {
+                    "type": "string",
+                    "example": "آیدا کریمی"
+                },
+                "amount": {
+                    "type": "integer",
+                    "example": 40000
+                },
+                "entity_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "occurred_at": {
+                    "type": "string",
+                    "example": "2026-10-19T07:10:00Z"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "pending"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "نان صبحگاهی · شعبه شریعتی"
+                },
+                "type": {
+                    "description": "Type: store_application, store_decision, or reservation.",
+                    "type": "string",
+                    "example": "store_application"
+                }
+            }
+        },
+        "dto.AdminApplicationBreakdownResponse": {
+            "type": "object",
+            "properties": {
+                "approved": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "pending": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "rejected": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "suspended": {
+                    "type": "integer",
+                    "example": 0
+                }
+            }
+        },
+        "dto.AdminDashboardResponse": {
+            "type": "object",
+            "properties": {
+                "applications": {
+                    "$ref": "#/definitions/dto.AdminApplicationBreakdownResponse"
+                },
+                "recent_activity": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AdminActivityItemResponse"
+                    }
+                },
+                "reservations": {
+                    "$ref": "#/definitions/dto.AdminReservationBreakdownResponse"
+                },
+                "totals": {
+                    "$ref": "#/definitions/dto.AdminDashboardTotalsResponse"
+                }
+            }
+        },
+        "dto.AdminDashboardTotalsResponse": {
+            "type": "object",
+            "properties": {
+                "active_offers": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "active_reservations": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "active_stores": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "completed_reservations": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "customers": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "pending_applications": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "platform_commission": {
+                    "type": "integer",
+                    "example": 200000
+                },
+                "registered_stores": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "total_reservations": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "vendors": {
+                    "type": "integer",
+                    "example": 4
+                }
+            }
+        },
         "dto.AdminManagedStoreListResponse": {
             "type": "object",
             "properties": {
@@ -3479,6 +3666,47 @@
                 "title": {
                     "type": "string",
                     "example": "بسته غافلگیری نانوایی"
+                }
+            }
+        },
+        "dto.AdminReservationBreakdownResponse": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "cancelled": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "completed": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "expired": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "no_show": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "paid": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "pending_payment": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "ready": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 2
                 }
             }
         },

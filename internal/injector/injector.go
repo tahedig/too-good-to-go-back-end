@@ -122,6 +122,7 @@ type database struct {
 	reservations    repository.ReservationRepository
 	vendors         repository.VendorApprovalRepository
 	vendorDashboard repository.VendorDashboardRepository
+	adminDashboard  repository.AdminDashboardRepository
 	adminStores     repository.AdminStoreRepository
 	storeManagement repository.AdminStoreManagementRepository
 	stores          repository.StoreRepository
@@ -147,6 +148,7 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 			reservations:    memory.NewReservationRepository(memOrders),
 			vendors:         memory.NewVendorApprovalRepository(),
 			vendorDashboard: memory.NewVendorDashboardRepository(),
+			adminDashboard:  memory.NewAdminDashboardRepository(),
 			adminStores:     memory.NewAdminStoreRepository(),
 		}, func() {}, nil
 	}
@@ -170,6 +172,7 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 		reservations:    postgres.NewReservationRepository(pool),
 		vendors:         postgres.NewVendorApprovalRepository(pool),
 		vendorDashboard: postgres.NewVendorDashboardRepository(pool),
+		adminDashboard:  postgres.NewAdminDashboardRepository(pool),
 		adminStores:     postgres.NewAdminStoreRepository(pool),
 		storeManagement: postgres.NewAdminStoreManagementRepository(pool),
 		stores:          postgres.NewStoreRepository(pool),
@@ -194,6 +197,10 @@ func provideVendorApprovalRepository(db *database) repository.VendorApprovalRepo
 
 func provideVendorDashboardRepository(db *database) repository.VendorDashboardRepository {
 	return db.vendorDashboard
+}
+
+func provideAdminDashboardRepository(db *database) repository.AdminDashboardRepository {
+	return db.adminDashboard
 }
 
 func provideAdminStoreRepository(db *database) repository.AdminStoreRepository {
@@ -305,6 +312,7 @@ func provideHandlers(
 	reservation handlerinterface.ReservationHandler,
 	vendorApproval handlerinterface.VendorApprovalHandler,
 	vendorDashboard handlerinterface.VendorDashboardHandler,
+	adminDashboard handlerinterface.AdminDashboardHandler,
 	adminStore handlerinterface.AdminStoreHandler,
 	adminStoreManagement handlerinterface.AdminStoreManagementHandler,
 	store handlerinterface.StoreHandler,
@@ -322,6 +330,7 @@ func provideHandlers(
 		Reservation:          reservation,
 		VendorApproval:       vendorApproval,
 		VendorDashboard:      vendorDashboard,
+		AdminDashboard:       adminDashboard,
 		AdminStore:           adminStore,
 		AdminStoreManagement: adminStoreManagement,
 		Store:                store,

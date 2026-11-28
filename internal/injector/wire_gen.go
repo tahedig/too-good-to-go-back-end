@@ -58,6 +58,9 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 	vendorDashboardRepository := provideVendorDashboardRepository(injectorDatabase)
 	vendorDashboardService := service.NewVendorDashboardService(vendorDashboardRepository)
 	vendorDashboardHandler := handler.NewVendorDashboardHandler(vendorDashboardService)
+	adminDashboardRepository := provideAdminDashboardRepository(injectorDatabase)
+	adminDashboardService := service.NewAdminDashboardService(adminDashboardRepository)
+	adminDashboardHandler := handler.NewAdminDashboardHandler(adminDashboardService)
 	adminStoreRepository := provideAdminStoreRepository(injectorDatabase)
 	adminStoreService := service.NewAdminStoreService(adminStoreRepository, log)
 	adminStoreHandler := handler.NewAdminStoreHandler(adminStoreService)
@@ -73,7 +76,7 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 	offerRepository := provideOfferRepository(injectorDatabase)
 	publicStoreService := providePublicStoreService(storeRepository, offerRepository)
 	publicStoreHandler := providePublicStoreHandler(publicStoreService)
-	handlers := provideHandlers(healthHandler, authHandler, catalogueHandler, userAuth, protectedHandler, profileHandler, orderHandler, reservationHandler, vendorApprovalHandler, vendorDashboardHandler, adminStoreHandler, adminStoreManagementHandler, storeHandler, storeRequestHandler, publicStoreHandler)
+	handlers := provideHandlers(healthHandler, authHandler, catalogueHandler, userAuth, protectedHandler, profileHandler, orderHandler, reservationHandler, vendorApprovalHandler, vendorDashboardHandler, adminDashboardHandler, adminStoreHandler, adminStoreManagementHandler, storeHandler, storeRequestHandler, publicStoreHandler)
 	engine, err := router.New(cfg, log, errorHandler, authMiddleware, rateLimiter, handlers)
 	if err != nil {
 		cleanup2()

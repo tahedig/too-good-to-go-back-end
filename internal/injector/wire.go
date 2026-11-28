@@ -28,6 +28,7 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 		provideReservationRepository,
 		provideVendorApprovalRepository,
 		provideVendorDashboardRepository,
+		provideAdminDashboardRepository,
 		provideAdminStoreRepository,
 		provideAdminStoreManagementRepository,
 		provideStoreRepository,
@@ -50,6 +51,7 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 		service.NewReservationService,
 		service.NewVendorApprovalService,
 		service.NewVendorDashboardService,
+		service.NewAdminDashboardService,
 		service.NewAdminStoreService,
 		provideAdminStoreManagementService,
 
@@ -62,6 +64,7 @@ func InitializeApp(cfg *bootstrap.Config, log *slog.Logger, version string) (*Ap
 		handler.NewReservationHandler,
 		handler.NewVendorApprovalHandler,
 		handler.NewVendorDashboardHandler,
+		handler.NewAdminDashboardHandler,
 		handler.NewAdminStoreHandler,
 		provideAdminStoreManagementHandler,
 		provideStoreHandler,
