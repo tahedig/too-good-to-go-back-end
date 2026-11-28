@@ -34,6 +34,10 @@ type Handlers struct {
 	Profile      handlerinterface.ProfileHandler
 	// VendorApproval serves the admin panel's store review (/admin/vendors).
 	VendorApproval handlerinterface.VendorApprovalHandler
+	// VendorDashboard serves the authenticated vendor's dashboard (/vendor/dashboard).
+	VendorDashboard handlerinterface.VendorDashboardHandler
+	// AdminDashboard serves the admin-only platform summary (/admin/dashboard).
+	AdminDashboard handlerinterface.AdminDashboardHandler
 	// AdminStore serves the admin panel's store details (/admin/stores).
 	AdminStore           handlerinterface.AdminStoreHandler
 	AdminStoreManagement handlerinterface.AdminStoreManagementHandler
@@ -91,7 +95,7 @@ func New(
 	auth.POST("/request", h.Auth.RequestOTP)
 	auth.POST("/verify", h.Auth.VerifyOTP)
 
-	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil || h.Profile != nil || h.Order != nil || h.Reservation != nil || h.VendorApproval != nil || h.AdminStore != nil || h.AdminStoreManagement != nil) {
+	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil || h.Profile != nil || h.Order != nil || h.Reservation != nil || h.VendorApproval != nil || h.VendorDashboard != nil || h.AdminDashboard != nil || h.AdminStore != nil || h.AdminStoreManagement != nil) {
 		// Refuse to start rather than serve private routes unauthenticated.
 		return nil, errors.New("router: auth middleware is required for protected routes")
 	}
@@ -111,6 +115,9 @@ func New(
 	if authMW != nil {
 		vendor.Use(authMW.Authenticate(), authMW.RequireRoles(enum.RoleVendor))
 	}
+	if h.UserAuth != nil {
+		vendor.Use(h.UserAuth.Optional())
+	}
 	if h.Store != nil {
 		vendor.GET("/stores", h.Store.ListStores)
 		vendor.GET("/stores/:id", h.Store.GetStore)
@@ -121,6 +128,9 @@ func New(
 		vendor.GET("/store-requests", h.StoreRequest.ListStoreRequests)
 		vendor.GET("/store-requests/:id", h.StoreRequest.GetStoreRequest)
 		vendor.POST("/store-requests", h.StoreRequest.CreateStoreRequest)
+	}
+	if h.VendorDashboard != nil {
+		vendor.GET("/dashboard", h.VendorDashboard.GetDashboard)
 	}
 	if h.Order != nil {
 		vendor.GET("/store", h.Order.GetVendorStore)
@@ -165,7 +175,7 @@ func New(
 	}
 
 	// Admin only: every /admin route needs a valid token with the admin role.
-	if h.VendorApproval != nil || h.AdminStore != nil || h.AdminStoreManagement != nil {
+	if h.VendorApproval != nil || h.AdminDashboard != nil || h.AdminStore != nil || h.AdminStoreManagement != nil {
 		admin := r.Group("/admin", authMW.Authenticate(), authMW.RequireRoles(enum.RoleAdmin))
 		if h.VendorApproval != nil {
 			admin.GET("/vendors", h.VendorApproval.ListVendors)
@@ -174,6 +184,9 @@ func New(
 			admin.POST("/vendors/:id/reject", h.VendorApproval.Reject)
 			admin.POST("/vendors/:id/suspend", h.VendorApproval.Suspend)
 			admin.POST("/vendors/:id/reactivate", h.VendorApproval.Reactivate)
+		}
+		if h.AdminDashboard != nil {
+			admin.GET("/dashboard", h.AdminDashboard.GetDashboard)
 		}
 		if h.AdminStoreManagement != nil {
 			admin.GET("/stores", h.AdminStoreManagement.ListStores)

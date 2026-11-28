@@ -8,6 +8,69 @@
     },
     "basePath": "/",
     "paths": {
+        "/admin/dashboard": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns admin-only platform totals for customers, vendors, stores, active offers, reservations, platform commission, application status breakdown, reservation status breakdown, and a concise recent-activity feed.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Admin dashboard summary",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of recent-activity items, 1-50 (default 10)",
+                        "name": "activity_limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated filter: store_application, store_decision, reservation",
+                        "name": "activity_type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AdminDashboardResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: invalid activity_limit or activity_type",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN: not an admin",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/offers/{offerId}": {
             "get": {
                 "security": [
@@ -128,6 +191,112 @@
                 }
             }
         },
+        "/admin/stores": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Filters stores by status, category, city, and accepts_orders. Deleted stores are excluded unless include_deleted=true. Limit defaults to 20 and is capped at 50.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List and search stores (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search store name, slug, city, or owner",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Approval status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Category ID",
+                        "name": "category_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Exact city filter",
+                        "name": "city",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Order acceptance filter",
+                        "name": "accepts_orders",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include soft-deleted stores",
+                        "name": "include_deleted",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "newest",
+                            "oldest"
+                        ],
+                        "type": "string",
+                        "description": "Sort order",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 50,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cursor from the previous page",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AdminManagedStoreListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/stores/{id}": {
             "get": {
                 "security": [
@@ -135,18 +304,17 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns store info, working hours, and location for the admin store details page.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "admin"
                 ],
-                "summary": "Get full store details (admin)",
+                "summary": "Get store profile (admin)",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Store ID",
+                        "description": "Store public ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -156,7 +324,81 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.AdminStoreDetailResponse"
+                            "$ref": "#/definitions/dto.AdminManagedStoreResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates store profile and accepts_orders. Ownership, approval status, and computed fields are ignored.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Update permitted store profile fields (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Store public ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Permitted store profile fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.AdminManagedStoreUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AdminManagedStoreResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
@@ -1749,6 +1991,71 @@
                 }
             }
         },
+        "/offers/{id}": {
+            "get": {
+                "description": "جزئیات کامل آفر برای صفحه محصول شامل اطلاعات آفر و فروشگاه، قیمت، بازه تحویل، آلرژن‌ها و موجودی فعلی. همان قوانین انتشار و دسترس‌پذیری کاتالوگ اعمال می‌شود.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "offers"
+                ],
+                "summary": "Product / offer details",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Offer public id (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "number",
+                        "description": "User latitude (fills distance_m and distance_text)",
+                        "name": "lat",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "User longitude",
+                        "name": "lng",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "DEV auth: users.id (fills is_favorite)",
+                        "name": "X-Dev-User-Id",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.OfferDetailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/orders": {
             "get": {
                 "security": [
@@ -1816,6 +2123,87 @@
                     },
                     "403": {
                         "description": "FORBIDDEN: the account is suspended, deleted or has no role",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/reservations": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a customer reservation with atomic inventory decrement. Supply an Idempotency-Key header to make repeated submissions safe; replaying the same key with the same payload returns the existing reservation (200), while reusing it with different parameters returns 409.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reservations"
+                ],
+                "summary": "Create a reservation (checkout)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Optional idempotency key for safe retries",
+                        "name": "Idempotency-Key",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Reservation checkout payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateReservationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Idempotent replay of an existing reservation",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ReservationResponse"
+                        }
+                    },
+                    "201": {
+                        "description": "Reservation created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ReservationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: invalid offer_id, quantity, terms_accepted or Idempotency-Key",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHORIZED: missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: offer does not exist",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT: offer unavailable, insufficient stock, or idempotency key parameter mismatch",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -2131,6 +2519,75 @@
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vendor/dashboard": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns dashboard metrics, reservation counts by status, today's activity (Asia/Tehran), financial overview, nearest active reservation, pending store applications, and recent reservations scoped strictly to stores owned by the authenticated vendor.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendor"
+                ],
+                "summary": "Vendor dashboard summary",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Optional UUID of an owned store to narrow the summary",
+                        "name": "store_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of recent reservations, 1-50 (default 10)",
+                        "name": "recent_limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorDashboardResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: invalid store_id or recent_limit",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN: not a vendor",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: store not found or not owned by vendor",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -2826,6 +3283,304 @@
         }
     },
     "definitions": {
+        "dto.AdminActivityItemResponse": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "example": "approve"
+                },
+                "actor_name": {
+                    "type": "string",
+                    "example": "آیدا کریمی"
+                },
+                "amount": {
+                    "type": "integer",
+                    "example": 40000
+                },
+                "entity_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "occurred_at": {
+                    "type": "string",
+                    "example": "2026-10-19T07:10:00Z"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "pending"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "نان صبحگاهی · شعبه شریعتی"
+                },
+                "type": {
+                    "description": "Type: store_application, store_decision, or reservation.",
+                    "type": "string",
+                    "example": "store_application"
+                }
+            }
+        },
+        "dto.AdminApplicationBreakdownResponse": {
+            "type": "object",
+            "properties": {
+                "approved": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "pending": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "rejected": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "suspended": {
+                    "type": "integer",
+                    "example": 0
+                }
+            }
+        },
+        "dto.AdminDashboardResponse": {
+            "type": "object",
+            "properties": {
+                "applications": {
+                    "$ref": "#/definitions/dto.AdminApplicationBreakdownResponse"
+                },
+                "recent_activity": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AdminActivityItemResponse"
+                    }
+                },
+                "reservations": {
+                    "$ref": "#/definitions/dto.AdminReservationBreakdownResponse"
+                },
+                "totals": {
+                    "$ref": "#/definitions/dto.AdminDashboardTotalsResponse"
+                }
+            }
+        },
+        "dto.AdminDashboardTotalsResponse": {
+            "type": "object",
+            "properties": {
+                "active_offers": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "active_reservations": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "active_stores": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "completed_reservations": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "customers": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "pending_applications": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "platform_commission": {
+                    "type": "integer",
+                    "example": 200000
+                },
+                "registered_stores": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "total_reservations": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "vendors": {
+                    "type": "integer",
+                    "example": 4
+                }
+            }
+        },
+        "dto.AdminManagedStoreListResponse": {
+            "type": "object",
+            "properties": {
+                "has_more": {
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AdminManagedStoreResponse"
+                    }
+                },
+                "next_cursor": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.AdminManagedStoreResponse": {
+            "type": "object",
+            "properties": {
+                "accepts_orders": {
+                    "type": "boolean"
+                },
+                "active_products_count": {
+                    "type": "integer"
+                },
+                "address_line": {
+                    "type": "string"
+                },
+                "approval_status": {
+                    "type": "string"
+                },
+                "biography": {
+                    "type": "string"
+                },
+                "category": {
+                    "type": "string"
+                },
+                "category_id": {
+                    "type": "integer"
+                },
+                "category_name": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "cover_image_url": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "district": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.StoreImageDTO"
+                    }
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "location": {
+                    "$ref": "#/definitions/dto.AdminStoreLocationResponse"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "meals_saved": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owner_name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "pickup_instructions": {
+                    "type": "string"
+                },
+                "rating_avg": {
+                    "type": "number"
+                },
+                "rating_count": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "trust_score": {
+                    "type": "number"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "vendor_status": {
+                    "type": "string"
+                },
+                "working_hours": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AdminStoreWorkingHourDTO"
+                    }
+                }
+            }
+        },
+        "dto.AdminManagedStoreUpdateRequest": {
+            "type": "object",
+            "properties": {
+                "accepts_orders": {
+                    "type": "boolean"
+                },
+                "address_line": {
+                    "type": "string"
+                },
+                "biography": {
+                    "type": "string"
+                },
+                "category_id": {
+                    "type": "integer"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "cover_image_url": {
+                    "type": "string"
+                },
+                "district": {
+                    "type": "string"
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.StoreImageDTO"
+                    }
+                },
+                "location": {
+                    "$ref": "#/definitions/dto.StoreLocationResponse"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "pickup_instructions": {
+                    "type": "string"
+                },
+                "working_hours": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.WorkingHourDTO"
+                    }
+                }
+            }
+        },
         "dto.AdminOfferListResponse": {
             "type": "object",
             "properties": {
@@ -2911,6 +3666,47 @@
                 "title": {
                     "type": "string",
                     "example": "بسته غافلگیری نانوایی"
+                }
+            }
+        },
+        "dto.AdminReservationBreakdownResponse": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "cancelled": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "completed": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "expired": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "no_show": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "paid": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "pending_payment": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "ready": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 2
                 }
             }
         },
@@ -3347,6 +4143,23 @@
                 }
             }
         },
+        "dto.CreateReservationRequest": {
+            "type": "object",
+            "properties": {
+                "offer_id": {
+                    "type": "string",
+                    "example": "7d0c2a3e-1f5b-4a52-8c64-2f4e9b1a0c33"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "terms_accepted": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
         "dto.CreateStoreRequestInput": {
             "type": "object",
             "properties": {
@@ -3507,6 +4320,132 @@
                 "user_id": {
                     "type": "string",
                     "example": "5f0c6d1e-8b7a-4c1e-9a3f-2d4b6c8e0a12"
+                }
+            }
+        },
+        "dto.OfferDetailResponse": {
+            "type": "object",
+            "properties": {
+                "allergens": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FilterOption"
+                    }
+                },
+                "allergens_declared": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "availability_badge": {
+                    "type": "string",
+                    "example": "۳ بسته موجود"
+                },
+                "cancellation_deadline": {
+                    "type": "string"
+                },
+                "category_name": {
+                    "type": "string",
+                    "example": "نانوایی"
+                },
+                "category_slug": {
+                    "type": "string",
+                    "example": "bakery"
+                },
+                "currency": {
+                    "type": "string",
+                    "example": "تومان"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "ترکیبی از نان‌ها و شیرینی‌های باقی‌مانده پخت امروز."
+                },
+                "discount_percent": {
+                    "type": "integer",
+                    "example": 65
+                },
+                "distance_m": {
+                    "type": "integer",
+                    "example": 600
+                },
+                "distance_text": {
+                    "type": "string",
+                    "example": "۰.۶ کیلومتر"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "7d0c2a3e-1f5b-4a52-8c64-2f4e9b1a0c33"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "is_favorite": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "original_price": {
+                    "type": "integer",
+                    "example": 115000
+                },
+                "pickup_end": {
+                    "type": "string"
+                },
+                "pickup_start": {
+                    "type": "string"
+                },
+                "pickup_window": {
+                    "type": "string",
+                    "example": "امروز، ۱۸:۰۰-۱۹:۰۰"
+                },
+                "price": {
+                    "type": "integer",
+                    "example": 40000
+                },
+                "quantity_available": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "store": {
+                    "$ref": "#/definitions/dto.OfferDetailStore"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "بسته غافلگیری نانوایی"
+                }
+            }
+        },
+        "dto.OfferDetailStore": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "example": "تهران، خیابان ولیعصر، پلاک ۱۲"
+                },
+                "city": {
+                    "type": "string",
+                    "example": "تهران"
+                },
+                "district": {
+                    "type": "string",
+                    "example": "ولیعصر"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "3f2b8f0e-6c1d-4c53-9a43-0d1d5c7a9e11"
+                },
+                "location": {
+                    "$ref": "#/definitions/dto.StoreLocationResponse"
+                },
+                "logo_url": {
+                    "type": "string",
+                    "example": "https://example.com/logo.png"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "نان صبحگاهی"
+                },
+                "pickup_instructions": {
+                    "type": "string",
+                    "example": "در بازه تعیین‌شده از پیشخوان تحویل بگیرید."
                 }
             }
         },
@@ -3807,6 +4746,137 @@
                 "message": {
                     "type": "string",
                     "example": "verification code sent"
+                }
+            }
+        },
+        "dto.ReservationOfferResponse": {
+            "type": "object",
+            "properties": {
+                "category_name": {
+                    "type": "string",
+                    "example": "نانوایی"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "7d0c2a3e-1f5b-4a52-8c64-2f4e9b1a0c33"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "offer_type": {
+                    "type": "string",
+                    "example": "surprise_bag"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "title": {
+                    "type": "string",
+                    "example": "بسته غافلگیری نانوایی"
+                },
+                "unit_original_price": {
+                    "type": "integer",
+                    "example": 115000
+                },
+                "unit_price": {
+                    "type": "integer",
+                    "example": 40000
+                }
+            }
+        },
+        "dto.ReservationResponse": {
+            "type": "object",
+            "properties": {
+                "cancellation_deadline": {
+                    "type": "string",
+                    "example": "2026-11-13T12:30:00Z"
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-11-13T10:00:00Z"
+                },
+                "currency": {
+                    "type": "string",
+                    "example": "تومان"
+                },
+                "group": {
+                    "type": "string",
+                    "example": "upcoming"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+                },
+                "items_total": {
+                    "type": "integer",
+                    "example": 40000
+                },
+                "offer": {
+                    "$ref": "#/definitions/dto.ReservationOfferResponse"
+                },
+                "pickup_code": {
+                    "type": "string",
+                    "example": "4821"
+                },
+                "pickup_end": {
+                    "type": "string",
+                    "example": "2026-11-13T15:30:00Z"
+                },
+                "pickup_start": {
+                    "type": "string",
+                    "example": "2026-11-13T14:30:00Z"
+                },
+                "pickup_window": {
+                    "type": "string",
+                    "example": "امروز، ۱۸:۰۰-۱۹:۰۰"
+                },
+                "reference": {
+                    "type": "string",
+                    "example": "THDG-7C9E6679"
+                },
+                "service_fee": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "status": {
+                    "type": "string",
+                    "example": "paid"
+                },
+                "status_label": {
+                    "type": "string",
+                    "example": "رزرو تأیید شده"
+                },
+                "store": {
+                    "$ref": "#/definitions/dto.ReservationStoreResponse"
+                },
+                "total_amount": {
+                    "type": "integer",
+                    "example": 40000
+                }
+            }
+        },
+        "dto.ReservationStoreResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "location": {
+                    "$ref": "#/definitions/dto.StoreLocationResponse"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "نان صبحگاهی"
+                },
+                "pickup_address": {
+                    "type": "string",
+                    "example": "تهران، خیابان ولیعصر، پلاک ۱۲"
+                },
+                "pickup_instructions": {
+                    "type": "string",
+                    "example": "از پیشخوان تحویل بگیرید."
                 }
             }
         },
@@ -4149,6 +5219,209 @@
                 }
             }
         },
+        "dto.VendorDashboardFinancialResponse": {
+            "type": "object",
+            "properties": {
+                "available_balance": {
+                    "type": "integer",
+                    "example": 300000
+                },
+                "net_period_revenue": {
+                    "type": "integer",
+                    "example": 1800000
+                },
+                "pending_payout": {
+                    "type": "integer",
+                    "example": 500000
+                },
+                "plan": {
+                    "$ref": "#/definitions/dto.VendorDashboardPlanResponse"
+                },
+                "received_payout": {
+                    "type": "integer",
+                    "example": 1000000
+                }
+            }
+        },
+        "dto.VendorDashboardKPIsResponse": {
+            "type": "object",
+            "properties": {
+                "active_offers": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "available_packages": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "received_revenue": {
+                    "type": "integer",
+                    "example": 1000000
+                },
+                "reserved_packages": {
+                    "type": "integer",
+                    "example": 3
+                }
+            }
+        },
+        "dto.VendorDashboardPlanResponse": {
+            "type": "object",
+            "properties": {
+                "commission_rate": {
+                    "type": "number",
+                    "example": 10
+                },
+                "name": {
+                    "type": "string",
+                    "example": "پایه · رایگان"
+                },
+                "period_end": {
+                    "type": "string",
+                    "example": "2026-11-01T00:00:00Z"
+                },
+                "period_start": {
+                    "type": "string",
+                    "example": "2026-10-01T00:00:00Z"
+                },
+                "remaining_days": {
+                    "type": "integer",
+                    "example": 12
+                }
+            }
+        },
+        "dto.VendorDashboardReservationSummary": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-10-19T10:00:00Z"
+                },
+                "customer_name": {
+                    "type": "string",
+                    "example": "لیلا علیزاده"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.OrderItemResponse"
+                    }
+                },
+                "items_total": {
+                    "type": "integer",
+                    "example": 40000
+                },
+                "payment_status": {
+                    "type": "string",
+                    "example": "succeeded"
+                },
+                "pickup_code": {
+                    "type": "string",
+                    "example": "4821"
+                },
+                "pickup_end": {
+                    "type": "string",
+                    "example": "2026-10-19T15:30:00Z"
+                },
+                "pickup_start": {
+                    "type": "string",
+                    "example": "2026-10-19T14:30:00Z"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "paid"
+                },
+                "store_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "store_name": {
+                    "type": "string",
+                    "example": "نان صبحگاهی"
+                },
+                "total_amount": {
+                    "type": "integer",
+                    "example": 40000
+                },
+                "vendor_payout": {
+                    "type": "integer",
+                    "example": 36000
+                }
+            }
+        },
+        "dto.VendorDashboardResponse": {
+            "type": "object",
+            "properties": {
+                "active_store": {
+                    "$ref": "#/definitions/dto.VendorDashboardStoreResponse"
+                },
+                "financial": {
+                    "$ref": "#/definitions/dto.VendorDashboardFinancialResponse"
+                },
+                "kpis": {
+                    "$ref": "#/definitions/dto.VendorDashboardKPIsResponse"
+                },
+                "nearest_reservation": {
+                    "$ref": "#/definitions/dto.VendorNearestReservationResponse"
+                },
+                "pending_store_requests": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.VendorPendingStoreBannerResponse"
+                    }
+                },
+                "recent_reservations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.VendorDashboardReservationSummary"
+                    }
+                },
+                "reservation_counts": {
+                    "$ref": "#/definitions/dto.VendorReservationCountsResponse"
+                },
+                "stores": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.VendorDashboardStoreResponse"
+                    }
+                },
+                "today": {
+                    "$ref": "#/definitions/dto.VendorTodayActivityResponse"
+                }
+            }
+        },
+        "dto.VendorDashboardStoreResponse": {
+            "type": "object",
+            "properties": {
+                "accepts_orders": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "address": {
+                    "type": "string",
+                    "example": "تهران، خیابان ولیعصر، پلاک ۱۲"
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-10-15T08:00:00Z"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "نان صبحگاهی"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "approved"
+                }
+            }
+        },
         "dto.VendorDecisionRequest": {
             "type": "object",
             "properties": {
@@ -4217,6 +5490,75 @@
                 "total": {
                     "type": "integer",
                     "example": 37
+                }
+            }
+        },
+        "dto.VendorNearestReservationResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-10-19T10:00:00Z"
+                },
+                "customer_name": {
+                    "type": "string",
+                    "example": "لیلا علیزاده"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+                },
+                "offer_image_url": {
+                    "type": "string",
+                    "example": "https://example.com/bag.jpg"
+                },
+                "offer_quantity_available": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "offer_quantity_reserved": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "offer_quantity_total": {
+                    "type": "integer",
+                    "example": 6
+                },
+                "offer_title": {
+                    "type": "string",
+                    "example": "بسته غافلگیری نانوایی"
+                },
+                "pickup_code": {
+                    "type": "string",
+                    "example": "4821"
+                },
+                "pickup_end": {
+                    "type": "string",
+                    "example": "2026-10-19T15:30:00Z"
+                },
+                "pickup_start": {
+                    "type": "string",
+                    "example": "2026-10-19T14:30:00Z"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "status": {
+                    "type": "string",
+                    "example": "paid"
+                },
+                "store_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "store_name": {
+                    "type": "string",
+                    "example": "نان صبحگاهی"
+                },
+                "total_amount": {
+                    "type": "integer",
+                    "example": 40000
                 }
             }
         },
@@ -4343,6 +5685,72 @@
                 }
             }
         },
+        "dto.VendorPendingStoreBannerResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "example": "تهران، خیابان شریعتی، پلاک ۲۴"
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-10-18T10:30:00Z"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440001"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "pending"
+                },
+                "store_name": {
+                    "type": "string",
+                    "example": "نان صبحگاهی · شعبه شریعتی"
+                }
+            }
+        },
+        "dto.VendorReservationCountsResponse": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "integer",
+                    "example": 4
+                },
+                "cancelled": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "completed": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "expired": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "no_show": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "paid": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "pending_payment": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "ready": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 15
+                }
+            }
+        },
         "dto.VendorResponse": {
             "type": "object",
             "properties": {
@@ -4441,6 +5849,27 @@
                 "start_time": {
                     "type": "string",
                     "example": "18:00"
+                }
+            }
+        },
+        "dto.VendorTodayActivityResponse": {
+            "type": "object",
+            "properties": {
+                "completed_count": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "packages_reserved": {
+                    "type": "integer",
+                    "example": 4
+                },
+                "reservations_count": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "revenue": {
+                    "type": "integer",
+                    "example": 120000
                 }
             }
         },

@@ -44,7 +44,7 @@ const (
 	catKindReadyMeal    = "ready_meal"
 	catKindGrocery      = "grocery"
 
-	cancellationCutoffBeforePickup = 2 * time.Hour
+	defaultCancellationCutoff = 2 * time.Hour
 )
 
 var catAllergenCodes = []string{"gluten", "dairy", "egg", "peanut", "nuts", "soy", "fish", "shellfish", "sesame"}
@@ -402,11 +402,11 @@ func (s *catalogueService) OfferDetail(ctx context.Context, offerPublicID string
 		PickupStart:          row.PickupStart,
 		PickupEnd:            row.PickupEnd,
 		PickupWindow:         pickupWindowText(row.PickupStart, row.PickupEnd, now),
-		CancellationDeadline: cancellationDeadline(row.PickupStart),
+		CancellationDeadline: resolveCancellationDeadline(row.CancellationDeadline, row.PickupStart),
 		CategorySlug:         row.CategorySlug,
 		CategoryName:         row.CategoryName,
 		Allergens:            allergens,
-		AllergensDeclared:    len(allergens) > 0,
+		AllergensDeclared:    row.AllergensDeclared,
 		DistanceM:            row.DistanceM,
 		DistanceText:         distanceText(row.DistanceM),
 		Store: dto.OfferDetailStore{
@@ -423,8 +423,11 @@ func (s *catalogueService) OfferDetail(ctx context.Context, offerPublicID string
 	}, nil
 }
 
-func cancellationDeadline(pickupStart time.Time) time.Time {
-	return pickupStart.UTC().Add(-cancellationCutoffBeforePickup)
+func resolveCancellationDeadline(explicit *time.Time, pickupStart time.Time) time.Time {
+	if explicit != nil {
+		return explicit.UTC()
+	}
+	return pickupStart.UTC().Add(-defaultCancellationCutoff)
 }
 
 func joinPersianAddress(city, line string) string {

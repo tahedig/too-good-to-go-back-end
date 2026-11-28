@@ -121,8 +121,13 @@ type database struct {
 	orders          repository.OrderRepository
 	reservations    repository.ReservationRepository
 	vendors         repository.VendorApprovalRepository
+	vendorDashboard repository.VendorDashboardRepository
+	adminDashboard  repository.AdminDashboardRepository
 	adminStores     repository.AdminStoreRepository
 	storeManagement repository.AdminStoreManagementRepository
+	stores          repository.StoreRepository
+	offers          repository.OfferRepository
+	storeRequests   repository.StoreRequestRepository
 	pool            *pgxpool.Pool
 	checkers        []serviceinterface.HealthChecker
 }
@@ -138,11 +143,13 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 		log.Warn("DATABASE_URL is not set: users and orders are kept in memory, are lost on restart and are not shared between instances")
 		memOrders := memory.NewOrderRepository()
 		return &database{
-			users:        memory.NewUserRepository(),
-			orders:       memOrders,
-			reservations: memory.NewReservationRepository(memOrders),
-			vendors:      memory.NewVendorApprovalRepository(),
-			adminStores:  memory.NewAdminStoreRepository(),
+			users:           memory.NewUserRepository(),
+			orders:          memOrders,
+			reservations:    memory.NewReservationRepository(memOrders),
+			vendors:         memory.NewVendorApprovalRepository(),
+			vendorDashboard: memory.NewVendorDashboardRepository(),
+			adminDashboard:  memory.NewAdminDashboardRepository(),
+			adminStores:     memory.NewAdminStoreRepository(),
 		}, func() {}, nil
 	}
 
@@ -164,8 +171,13 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 		orders:          postgres.NewOrderRepository(pool),
 		reservations:    postgres.NewReservationRepository(pool),
 		vendors:         postgres.NewVendorApprovalRepository(pool),
+		vendorDashboard: postgres.NewVendorDashboardRepository(pool),
+		adminDashboard:  postgres.NewAdminDashboardRepository(pool),
 		adminStores:     postgres.NewAdminStoreRepository(pool),
 		storeManagement: postgres.NewAdminStoreManagementRepository(pool),
+		stores:          postgres.NewStoreRepository(pool),
+		offers:          postgres.NewOfferRepository(pool),
+		storeRequests:   postgres.NewStoreRequestRepository(pool),
 		pool:            pool,
 		checkers:        []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
 	}, pool.Close, nil
@@ -181,6 +193,14 @@ func provideReservationRepository(db *database) repository.ReservationRepository
 
 func provideVendorApprovalRepository(db *database) repository.VendorApprovalRepository {
 	return db.vendors
+}
+
+func provideVendorDashboardRepository(db *database) repository.VendorDashboardRepository {
+	return db.vendorDashboard
+}
+
+func provideAdminDashboardRepository(db *database) repository.AdminDashboardRepository {
+	return db.adminDashboard
 }
 
 func provideAdminStoreRepository(db *database) repository.AdminStoreRepository {
@@ -203,6 +223,56 @@ func provideAdminStoreManagementHandler(svc serviceinterface.AdminStoreManagemen
 		return nil
 	}
 	return handler.NewAdminStoreManagementHandler(svc)
+}
+
+func provideStoreRepository(db *database) repository.StoreRepository { return db.stores }
+
+func provideOfferRepository(db *database) repository.OfferRepository { return db.offers }
+
+func provideStoreRequestRepository(db *database) repository.StoreRequestRepository {
+	return db.storeRequests
+}
+
+func provideStoreService(stores repository.StoreRepository) serviceinterface.StoreService {
+	if stores == nil {
+		return nil
+	}
+	return service.NewStoreService(stores)
+}
+
+func provideStoreRequestService(reqs repository.StoreRequestRepository) serviceinterface.StoreRequestService {
+	if reqs == nil {
+		return nil
+	}
+	return service.NewStoreRequestService(reqs)
+}
+
+func providePublicStoreService(stores repository.StoreRepository, offers repository.OfferRepository) serviceinterface.PublicStoreService {
+	if stores == nil {
+		return nil
+	}
+	return service.NewPublicStoreService(stores, offers)
+}
+
+func provideStoreHandler(svc serviceinterface.StoreService) handlerinterface.StoreHandler {
+	if svc == nil {
+		return nil
+	}
+	return handler.NewStoreHandler(svc)
+}
+
+func provideStoreRequestHandler(svc serviceinterface.StoreRequestService) handlerinterface.StoreRequestHandler {
+	if svc == nil {
+		return nil
+	}
+	return handler.NewStoreRequestHandler(svc)
+}
+
+func providePublicStoreHandler(svc serviceinterface.PublicStoreService) handlerinterface.PublicStoreHandler {
+	if svc == nil {
+		return nil
+	}
+	return handler.NewPublicStoreHandler(svc)
 }
 
 // providePhoneRoles maps ADMIN_PHONES / VENDOR_PHONES to the role a new user
@@ -241,8 +311,13 @@ func provideHandlers(
 	order handlerinterface.OrderHandler,
 	reservation handlerinterface.ReservationHandler,
 	vendorApproval handlerinterface.VendorApprovalHandler,
+	vendorDashboard handlerinterface.VendorDashboardHandler,
+	adminDashboard handlerinterface.AdminDashboardHandler,
 	adminStore handlerinterface.AdminStoreHandler,
 	adminStoreManagement handlerinterface.AdminStoreManagementHandler,
+	store handlerinterface.StoreHandler,
+	storeRequest handlerinterface.StoreRequestHandler,
+	publicStore handlerinterface.PublicStoreHandler,
 ) router.Handlers {
 	return router.Handlers{
 		Health:               health,
@@ -254,7 +329,12 @@ func provideHandlers(
 		Order:                order,
 		Reservation:          reservation,
 		VendorApproval:       vendorApproval,
+		VendorDashboard:      vendorDashboard,
+		AdminDashboard:       adminDashboard,
 		AdminStore:           adminStore,
 		AdminStoreManagement: adminStoreManagement,
+		Store:                store,
+		StoreRequest:         storeRequest,
+		PublicStore:          publicStore,
 	}
 }

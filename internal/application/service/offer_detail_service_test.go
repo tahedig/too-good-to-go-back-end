@@ -34,6 +34,7 @@ func TestOfferDetailSuccessAndValidation(t *testing.T) {
 			CategorySlug:            "bakery",
 			CategoryName:            "نانوایی",
 			Allergens:               []model.CatalogueAllergen{{Code: "gluten", NameFA: "گلوتن"}},
+			AllergensDeclared:       true,
 			StorePublicID:           storeID,
 			StoreName:               "نان صبحگاهی",
 			StoreCity:               "تهران",
@@ -82,6 +83,21 @@ func TestOfferDetailSuccessAndValidation(t *testing.T) {
 		t.Fatal("expected error for missing lng")
 	} else if appErr, ok := err.(exception.AppError); !ok || appErr.StatusCode() != http.StatusBadRequest {
 		t.Fatalf("want 400, got %v", err)
+	}
+
+	// Explicit cancellation_deadline and allergens_declared=false override defaults
+	customDeadline := pickupStart.Add(-30 * time.Minute)
+	repo.detail.CancellationDeadline = &customDeadline
+	repo.detail.AllergensDeclared = false
+	res2, err := svc.OfferDetail(context.Background(), offerID, dto.OfferDetailQuery{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !res2.CancellationDeadline.Equal(customDeadline) {
+		t.Errorf("got cancellation deadline %v, want %v", res2.CancellationDeadline, customDeadline)
+	}
+	if res2.AllergensDeclared {
+		t.Errorf("got allergens_declared=true, want false when offer has allergens_declared=false")
 	}
 
 	// Not found / ineligible -> 404

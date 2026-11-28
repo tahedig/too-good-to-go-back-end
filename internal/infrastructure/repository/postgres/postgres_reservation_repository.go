@@ -49,7 +49,7 @@ WHERE o.user_id = $1 AND o.idempotency_key = $2`
 const loadOfferForCheckoutSQL = `
 SELECT f.id, f.public_id::text, f.store_id, f.offer_type::text, f.title, f.image_url,
        f.original_price, f.discount_price, f.quantity_available, f.max_per_user,
-       f.pickup_start, f.pickup_end, f.status::text,
+       f.pickup_start, f.pickup_end, f.cancellation_deadline, f.status::text,
        s.public_id::text, s.name, s.city, s.address_line,
        COALESCE(s.pickup_instructions, ''),
        ST_Y(s.location::geometry), ST_X(s.location::geometry),
@@ -97,7 +97,7 @@ INSERT INTO order_items (
 VALUES ($1, $2, $3, $4, $5, $6, $7)`
 
 const getReservationByPublicIDAndUserSQL = `
-SELECT o.public_id::text, o.pickup_code, o.status::text,
+SELECT o.public_id::text, COALESCE(o.pickup_code, ''), o.status::text,
        o.items_total, o.service_fee, o.total_amount, o.created_at,
        s.public_id::text, s.name, s.city, s.address_line,
        COALESCE(s.pickup_instructions, ''),
@@ -105,14 +105,14 @@ SELECT o.public_id::text, o.pickup_code, o.status::text,
        f.public_id::text, oi.title_snapshot, f.offer_type::text, f.image_url,
        COALESCE(c.name_fa, ''),
        oi.quantity, oi.unit_price, oi.unit_original_price,
-       f.pickup_start, f.pickup_end
+       f.pickup_start, f.pickup_end, f.cancellation_deadline
 FROM orders o
 JOIN stores s ON s.id = o.store_id
 JOIN order_items oi ON oi.order_id = o.id
 JOIN offers f ON f.id = oi.offer_id
 LEFT JOIN categories c ON c.id = COALESCE(f.category_id, s.category_id)
 WHERE o.public_id = $1::uuid
-  AND o.user_id = (SELECT u.id FROM users u WHERE u.public_id = $2::uuid)
+  AND o.user_id = (SELECT u.id FROM users u WHERE u.public_id = $2::uuid AND u.deleted_at IS NULL)
 ORDER BY oi.id
 LIMIT 1`
 
@@ -167,6 +167,7 @@ func (r *reservationRepository) Create(
 			originalPrice, discountPrice    int64
 			qtyAvailable, maxPerUser        int
 			pickupStart, pickupEnd          time.Time
+			cancellationDeadline            *time.Time
 			offerStatus                     string
 			storePublicID, storeName        string
 			storeCity, storeAddress         string
@@ -181,7 +182,7 @@ func (r *reservationRepository) Create(
 		if err := tx.QueryRow(ctx, loadOfferForCheckoutSQL, params.OfferPublicID).Scan(
 			&offerID, &offerPublicID, &storeID, &offerType, &title, &imageURL,
 			&originalPrice, &discountPrice, &qtyAvailable, &maxPerUser,
-			&pickupStart, &pickupEnd, &offerStatus,
+			&pickupStart, &pickupEnd, &cancellationDeadline, &offerStatus,
 			&storePublicID, &storeName, &storeCity, &storeAddress,
 			&storePickupInstructions,
 			&storeLat, &storeLng,
@@ -284,6 +285,11 @@ func (r *reservationRepository) Create(
 
 		ps := pickupStart.UTC()
 		pe := pickupEnd.UTC()
+		var cd *time.Time
+		if cancellationDeadline != nil {
+			t := cancellationDeadline.UTC()
+			cd = &t
+		}
 		lat, lng := storeLat, storeLng
 		result = &repository.CreateReservationResult{
 			Reservation: &model.Reservation{
@@ -310,13 +316,14 @@ func (r *reservationRepository) Create(
 					UnitPrice:         discountPrice,
 					UnitOriginalPrice: originalPrice,
 				},
-				ItemsTotal:  itemsTotal,
-				ServiceFee:  serviceFee,
-				TotalAmount: totalAmount,
-				Currency:    defaultCurrencyToman,
-				PickupStart: &ps,
-				PickupEnd:   &pe,
-				CreatedAt:   createdAt.UTC(),
+				ItemsTotal:           itemsTotal,
+				ServiceFee:           serviceFee,
+				TotalAmount:          totalAmount,
+				Currency:             defaultCurrencyToman,
+				PickupStart:          &ps,
+				PickupEnd:            &pe,
+				CancellationDeadline: cd,
+				CreatedAt:            createdAt.UTC(),
 			},
 			Replayed: false,
 		}
@@ -376,6 +383,7 @@ func (r *reservationRepository) getByPublicIDAndUser(
 		status                 string
 		lat, lng               float64
 		pickupStart, pickupEnd time.Time
+		cancellationDeadline   *time.Time
 	)
 	err := db.QueryRow(ctx, getReservationByPublicIDAndUserSQL, reservationPublicID, userPublicID).Scan(
 		&res.ID, &res.PickupCode, &status,
@@ -386,7 +394,7 @@ func (r *reservationRepository) getByPublicIDAndUser(
 		&res.Offer.ID, &res.Offer.Title, &res.Offer.OfferType, &res.Offer.ImageURL,
 		&res.Offer.CategoryName,
 		&res.Offer.Quantity, &res.Offer.UnitPrice, &res.Offer.UnitOriginalPrice,
-		&pickupStart, &pickupEnd,
+		&pickupStart, &pickupEnd, &cancellationDeadline,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -402,6 +410,10 @@ func (r *reservationRepository) getByPublicIDAndUser(
 	ps, pe := pickupStart.UTC(), pickupEnd.UTC()
 	res.PickupStart = &ps
 	res.PickupEnd = &pe
+	if cancellationDeadline != nil {
+		cd := cancellationDeadline.UTC()
+		res.CancellationDeadline = &cd
+	}
 	res.CreatedAt = res.CreatedAt.UTC()
 	return &res, nil
 }

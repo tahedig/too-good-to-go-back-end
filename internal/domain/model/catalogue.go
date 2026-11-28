@@ -156,9 +156,11 @@ type CatalogueOfferDetail struct {
 	QuantityAvailable       int
 	PickupStart             time.Time
 	PickupEnd               time.Time
+	CancellationDeadline    *time.Time
 	CategorySlug            string
 	CategoryName            string
 	Allergens               []CatalogueAllergen
+	AllergensDeclared       bool
 	StorePublicID           string
 	StoreName               string
 	StoreLogoURL            *string

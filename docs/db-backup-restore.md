@@ -56,3 +56,4 @@ Restore to `tgtg_restore_*` first, inspect it, then switch the app's `DB_URL` to
 - Redis (OTP/rate-limit data) is not covered; it is ephemeral by design.
 - Monitor `LAST_BACKUP_SUCCESS` in `BACKUP_DIR` or the systemd unit result and alert if older than 26h.
 - Restore drills read the backup as `tgtg-backup`; if the restore server differs, set `RESTORE_PGHOST` and add its entry to `.pgpass`.
+- If `BACKUP_GPG_RECIPIENT` is enabled, `tgtg-db-restore-verify.service` must run on a host that has the corresponding GPG private key to decrypt backups before verifying them.

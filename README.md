@@ -189,7 +189,7 @@ Protected routes require an HS256 access token:
 | `GET` | `/test/customer` | `customer` | RBAC test route |
 | `GET` | `/test/vendor` | `vendor` | RBAC test route |
 | `GET` | `/test/admin` | `admin` | RBAC test route |
-| any | `/vendor/stores...`, `/vendor/store-requests...` | `vendor` | Vendor store management |
+| any | `/vendor/stores...`, `/vendor/store-requests...`, `/vendor/dashboard` | `vendor` | Vendor store & dashboard management |
 
 A missing, malformed, expired or wrongly signed token, a wrong issuer or
 algorithm, or an unknown role gets `401 UNAUTHORIZED`; a valid token with the
@@ -305,6 +305,18 @@ curl -H "Authorization: Bearer $TOKEN" "http://localhost:8080/orders?group=upcom
 Without `DATABASE_URL` orders are kept in memory and the list starts empty:
 nothing creates orders yet.
 
+## Vendor dashboard
+
+`GET /vendor/dashboard` returns dashboard metrics for the authenticated vendor (`vendor` role only: `401` without a valid token, `403` for any other role), scoped strictly to stores owned by that vendor.
+
+| Query | Meaning |
+|---|---|
+| `store_id` | Optional UUID of an owned store to narrow the summary; unknown or unowned store IDs return `404` |
+| `recent_limit` | Maximum recent reservations returned, 1-50 (default 10) |
+
+- Returns `active_store`, `stores`, `pending_store_requests`, `kpis` (`received_revenue`, `reserved_packages`, `available_packages`, `active_offers`), `reservation_counts` (per status plus `active` and `total`), `today` (Asia/Tehran day activity), `financial` (payout summary + commission plan), `nearest_reservation`, and `recent_reservations`.
+- All queries run inside a single read-only `RepeatableRead` snapshot in PostgreSQL, with `Cache-Control: no-store`. Amounts are in Toman and timestamps are UTC.
+
 ## Vendor approval (admin)
 
 Admins review stores under `/admin/vendors` (admin role only: `401` without a
@@ -344,6 +356,18 @@ here is a store; `stores.status` is the only status there is.
 
 Browsers on other origins (the admin panel) need `CORS_ALLOWED_ORIGINS`; in
 development it defaults to `http://localhost:5173`.
+
+## Admin dashboard
+
+`GET /admin/dashboard` returns an admin-only platform summary (`admin` role only: `401` without a valid token, `403` for any other role).
+
+| Query | Meaning |
+|---|---|
+| `activity_limit` | Maximum recent-activity items returned, 1-50 (default 10) |
+| `activity_type` | Optional comma-separated filter: `store_application`, `store_decision`, `reservation` |
+
+- Returns `totals` (`customers`, `vendors`, `registered_stores`, `active_stores`, `active_offers`, `pending_applications`, `total_reservations`, `active_reservations`, `completed_reservations`, `platform_commission`), `applications` (counts per `store_status`), `reservations` (counts per `order_status` plus `active` and `total`), and `recent_activity` (newest first).
+- All queries run inside a single read-only `RepeatableRead` snapshot in PostgreSQL, with `Cache-Control: no-store`. Amounts are in Toman and timestamps are UTC.
 
 ## Error response format
 
