@@ -34,6 +34,8 @@ type Handlers struct {
 	Profile      handlerinterface.ProfileHandler
 	// VendorApproval serves the admin panel's store review (/admin/vendors).
 	VendorApproval handlerinterface.VendorApprovalHandler
+	// VendorDashboard serves the authenticated vendor's dashboard (/vendor/dashboard).
+	VendorDashboard handlerinterface.VendorDashboardHandler
 	// AdminStore serves the admin panel's store details (/admin/stores).
 	AdminStore           handlerinterface.AdminStoreHandler
 	AdminStoreManagement handlerinterface.AdminStoreManagementHandler
@@ -91,7 +93,7 @@ func New(
 	auth.POST("/request", h.Auth.RequestOTP)
 	auth.POST("/verify", h.Auth.VerifyOTP)
 
-	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil || h.Profile != nil || h.Order != nil || h.Reservation != nil || h.VendorApproval != nil || h.AdminStore != nil || h.AdminStoreManagement != nil) {
+	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil || h.Profile != nil || h.Order != nil || h.Reservation != nil || h.VendorApproval != nil || h.VendorDashboard != nil || h.AdminStore != nil || h.AdminStoreManagement != nil) {
 		// Refuse to start rather than serve private routes unauthenticated.
 		return nil, errors.New("router: auth middleware is required for protected routes")
 	}
@@ -124,6 +126,9 @@ func New(
 		vendor.GET("/store-requests", h.StoreRequest.ListStoreRequests)
 		vendor.GET("/store-requests/:id", h.StoreRequest.GetStoreRequest)
 		vendor.POST("/store-requests", h.StoreRequest.CreateStoreRequest)
+	}
+	if h.VendorDashboard != nil {
+		vendor.GET("/dashboard", h.VendorDashboard.GetDashboard)
 	}
 	if h.Order != nil {
 		vendor.GET("/store", h.Order.GetVendorStore)

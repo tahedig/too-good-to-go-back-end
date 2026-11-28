@@ -121,6 +121,7 @@ type database struct {
 	orders          repository.OrderRepository
 	reservations    repository.ReservationRepository
 	vendors         repository.VendorApprovalRepository
+	vendorDashboard repository.VendorDashboardRepository
 	adminStores     repository.AdminStoreRepository
 	storeManagement repository.AdminStoreManagementRepository
 	stores          repository.StoreRepository
@@ -141,11 +142,12 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 		log.Warn("DATABASE_URL is not set: users and orders are kept in memory, are lost on restart and are not shared between instances")
 		memOrders := memory.NewOrderRepository()
 		return &database{
-			users:        memory.NewUserRepository(),
-			orders:       memOrders,
-			reservations: memory.NewReservationRepository(memOrders),
-			vendors:      memory.NewVendorApprovalRepository(),
-			adminStores:  memory.NewAdminStoreRepository(),
+			users:           memory.NewUserRepository(),
+			orders:          memOrders,
+			reservations:    memory.NewReservationRepository(memOrders),
+			vendors:         memory.NewVendorApprovalRepository(),
+			vendorDashboard: memory.NewVendorDashboardRepository(),
+			adminStores:     memory.NewAdminStoreRepository(),
 		}, func() {}, nil
 	}
 
@@ -167,6 +169,7 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 		orders:          postgres.NewOrderRepository(pool),
 		reservations:    postgres.NewReservationRepository(pool),
 		vendors:         postgres.NewVendorApprovalRepository(pool),
+		vendorDashboard: postgres.NewVendorDashboardRepository(pool),
 		adminStores:     postgres.NewAdminStoreRepository(pool),
 		storeManagement: postgres.NewAdminStoreManagementRepository(pool),
 		stores:          postgres.NewStoreRepository(pool),
@@ -187,6 +190,10 @@ func provideReservationRepository(db *database) repository.ReservationRepository
 
 func provideVendorApprovalRepository(db *database) repository.VendorApprovalRepository {
 	return db.vendors
+}
+
+func provideVendorDashboardRepository(db *database) repository.VendorDashboardRepository {
+	return db.vendorDashboard
 }
 
 func provideAdminStoreRepository(db *database) repository.AdminStoreRepository {
@@ -297,6 +304,7 @@ func provideHandlers(
 	order handlerinterface.OrderHandler,
 	reservation handlerinterface.ReservationHandler,
 	vendorApproval handlerinterface.VendorApprovalHandler,
+	vendorDashboard handlerinterface.VendorDashboardHandler,
 	adminStore handlerinterface.AdminStoreHandler,
 	adminStoreManagement handlerinterface.AdminStoreManagementHandler,
 	store handlerinterface.StoreHandler,
@@ -313,6 +321,7 @@ func provideHandlers(
 		Order:                order,
 		Reservation:          reservation,
 		VendorApproval:       vendorApproval,
+		VendorDashboard:      vendorDashboard,
 		AdminStore:           adminStore,
 		AdminStoreManagement: adminStoreManagement,
 		Store:                store,
