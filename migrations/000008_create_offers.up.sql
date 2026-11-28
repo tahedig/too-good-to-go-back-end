@@ -1,8 +1,8 @@
 CREATE TYPE offer_type    AS ENUM ('surprise_bag', 'specific_item');
-CREATE TYPE offer_status  AS ENUM ('draft', 'active', 'sold_out', 'expired', 'cancelled');
-CREATE TYPE allergen_type AS ENUM ('gluten', 'nuts', 'peanut', 'milk', 'egg', 'soy', 'fish', 'shellfish', 'sesame');
+CREATE TYPE offer_status  AS ENUM ('draft', 'active', 'inactive', 'sold_out', 'expired', 'cancelled');
+CREATE TYPE allergen_type AS ENUM ('gluten', 'dairy', 'egg', 'peanut', 'nuts', 'soy', 'fish', 'shellfish', 'sesame');
 
--- Allergen list validator: no NULL elements, no duplicates (empty list = "no allergens").
+-- Allergen list validator: no NULL elements, no duplicates (empty list = "no allergens" or "unknown" per allergens_declared).
 CREATE OR REPLACE FUNCTION fn_valid_allergen_list(a allergen_type[]) RETURNS BOOLEAN AS $$
     SELECT a IS NOT NULL
        AND array_position(a, NULL::allergen_type) IS NULL
@@ -47,34 +47,36 @@ CREATE TRIGGER trg_templates_updated
     FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
 
 CREATE TABLE offers (
-    id                 BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    public_id          UUID            NOT NULL DEFAULT gen_random_uuid(),
-    store_id           BIGINT          NOT NULL,
-    template_id        BIGINT,
-    offer_type         offer_type      NOT NULL,
-    title              TEXT            NOT NULL,
-    description        TEXT            NOT NULL,             -- mandatory, esp. for surprise bags
-    ai_generated       BOOLEAN         NOT NULL DEFAULT false,
-    image_url          TEXT,
-    category_id        SMALLINT,
-    original_price     BIGINT          NOT NULL,
-    discount_price     BIGINT          NOT NULL,
-    discount_percent   SMALLINT        GENERATED ALWAYS AS
-                         (round((1 - discount_price::numeric / original_price) * 100)::smallint) STORED,
-    quantity_total     INT             NOT NULL,
-    quantity_available INT             NOT NULL,
-    max_per_user       SMALLINT        NOT NULL DEFAULT 2,
-    pickup_start       TIMESTAMPTZ     NOT NULL,
-    pickup_end         TIMESTAMPTZ     NOT NULL,
-    allergens          allergen_type[] NOT NULL DEFAULT '{}',
-    allergens_declared BOOLEAN         NOT NULL DEFAULT false,  -- vendor confirmed the list
-    status             offer_status    NOT NULL DEFAULT 'draft',
-    version            INT             NOT NULL DEFAULT 1,      -- optimistic locking for vendor edits
-    search_vector      TSVECTOR        GENERATED ALWAYS AS
-                         (to_tsvector('simple', coalesce(title, '') || ' ' || coalesce(description, ''))) STORED,
-    published_at       TIMESTAMPTZ,
-    created_at         TIMESTAMPTZ     NOT NULL DEFAULT now(),
-    updated_at         TIMESTAMPTZ     NOT NULL DEFAULT now(),
+    id                    BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    public_id             UUID            NOT NULL DEFAULT gen_random_uuid(),
+    store_id              BIGINT          NOT NULL,
+    template_id           BIGINT,
+    offer_type            offer_type      NOT NULL,
+    title                 TEXT            NOT NULL,
+    description           TEXT            NOT NULL,             -- mandatory, esp. for surprise bags
+    ai_generated          BOOLEAN         NOT NULL DEFAULT false,
+    image_url             TEXT,
+    category_id           SMALLINT,
+    original_price        BIGINT          NOT NULL,
+    discount_price        BIGINT          NOT NULL,
+    discount_percent      SMALLINT        GENERATED ALWAYS AS
+                            (round((1 - discount_price::numeric / original_price) * 100)::smallint) STORED,
+    quantity_total        INT             NOT NULL,
+    quantity_available    INT             NOT NULL,
+    max_per_user          SMALLINT        NOT NULL DEFAULT 2,
+    pickup_start          TIMESTAMPTZ     NOT NULL,
+    pickup_end            TIMESTAMPTZ     NOT NULL,
+    cancellation_deadline TIMESTAMPTZ,                          -- per-offer cutoff (Figma: لغو تا ۱۶:۰۰)
+    allergens             allergen_type[] NOT NULL DEFAULT '{}',
+    allergens_declared    BOOLEAN         NOT NULL DEFAULT false, -- false => "مواد اولیه و حساسیت‌زاها نامشخص است"
+    status                offer_status    NOT NULL DEFAULT 'draft',
+    version               INT             NOT NULL DEFAULT 1,    -- optimistic locking for vendor edits
+    search_vector         TSVECTOR        GENERATED ALWAYS AS
+                            (to_tsvector('simple', coalesce(title, '') || ' ' || coalesce(description, ''))) STORED,
+    published_at          TIMESTAMPTZ,
+    created_at            TIMESTAMPTZ     NOT NULL DEFAULT now(),
+    updated_at            TIMESTAMPTZ     NOT NULL DEFAULT now(),
+    deleted_at            TIMESTAMPTZ,
     CONSTRAINT offers_public_id_key    UNIQUE (public_id),
     CONSTRAINT offers_id_store_uq      UNIQUE (id, store_id),
     CONSTRAINT offers_store_fkey       FOREIGN KEY (store_id)    REFERENCES stores(id),
@@ -88,16 +90,16 @@ CREATE TABLE offers (
     CONSTRAINT offers_stock_chk        CHECK (quantity_available BETWEEN 0 AND quantity_total),
     CONSTRAINT offers_max_per_user_chk CHECK (max_per_user > 0),
     CONSTRAINT offers_window_chk       CHECK (pickup_end > pickup_start),
-    CONSTRAINT offers_allergens_chk    CHECK (fn_valid_allergen_list(allergens)),
-    CONSTRAINT offers_allergen_chk     CHECK (status <> 'active' OR allergens_declared)
+    CONSTRAINT offers_cancel_chk       CHECK (cancellation_deadline IS NULL OR cancellation_deadline <= pickup_start),
+    CONSTRAINT offers_allergens_chk    CHECK (fn_valid_allergen_list(allergens))
 );
-CREATE INDEX idx_offers_store         ON offers(store_id, pickup_end DESC);
-CREATE INDEX idx_offers_active_browse ON offers(category_id, pickup_end) WHERE status = 'active';
-CREATE INDEX idx_offers_active_price  ON offers(discount_price)          WHERE status = 'active';
-CREATE INDEX idx_offers_active_end    ON offers(pickup_end)              WHERE status IN ('active', 'sold_out');
-CREATE INDEX idx_offers_template      ON offers(template_id)             WHERE template_id IS NOT NULL;
+CREATE INDEX idx_offers_store         ON offers(store_id, pickup_end DESC) WHERE deleted_at IS NULL;
+CREATE INDEX idx_offers_active_browse ON offers(category_id, pickup_end)   WHERE status = 'active' AND deleted_at IS NULL;
+CREATE INDEX idx_offers_active_price  ON offers(discount_price)            WHERE status = 'active' AND deleted_at IS NULL;
+CREATE INDEX idx_offers_active_end    ON offers(pickup_end)                WHERE status IN ('active', 'sold_out') AND deleted_at IS NULL;
+CREATE INDEX idx_offers_template      ON offers(template_id)               WHERE template_id IS NOT NULL;
 CREATE INDEX idx_offers_fts           ON offers USING GIN (search_vector);
-CREATE INDEX idx_offers_allergens     ON offers USING GIN (allergens) WHERE status = 'active';
+CREATE INDEX idx_offers_allergens     ON offers USING GIN (allergens)      WHERE status = 'active' AND deleted_at IS NULL;
 CREATE INDEX idx_offers_title_trgm    ON offers USING GIN (title gin_trgm_ops);
 -- prevents the template job from creating the same occurrence twice
 CREATE UNIQUE INDEX uq_offers_template_day ON offers(template_id, pickup_start) WHERE template_id IS NOT NULL;
@@ -105,6 +107,14 @@ CREATE UNIQUE INDEX uq_offers_template_day ON offers(template_id, pickup_start) 
 CREATE TRIGGER trg_offers_updated
     BEFORE UPDATE ON offers
     FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+
+-- Join table for catalogue allergen filtering (references allergens seeded in 000007).
+CREATE TABLE offer_allergens (
+    offer_id      BIGINT NOT NULL REFERENCES offers(id) ON DELETE CASCADE,
+    allergen_code TEXT   NOT NULL REFERENCES allergens(code),
+    PRIMARY KEY (offer_id, allergen_code)
+);
+CREATE INDEX idx_offer_allergens_code ON offer_allergens (allergen_code, offer_id);
 
 -- Minimum discount (anti price-inflation), read from platform_settings.
 CREATE OR REPLACE FUNCTION fn_offer_min_discount() RETURNS trigger AS $$

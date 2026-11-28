@@ -1,3 +1,4 @@
+DROP TABLE    IF EXISTS offer_allergens;
 DROP TRIGGER  IF EXISTS trg_offers_store_approved ON offers;
 DROP TRIGGER  IF EXISTS trg_offers_min_discount   ON offers;
 DROP TRIGGER  IF EXISTS trg_offers_updated        ON offers;

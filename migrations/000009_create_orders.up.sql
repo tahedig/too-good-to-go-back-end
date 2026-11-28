@@ -6,13 +6,14 @@ CREATE TABLE orders (
     public_id              UUID         NOT NULL DEFAULT gen_random_uuid(),
     user_id                BIGINT       NOT NULL,
     store_id               BIGINT       NOT NULL,
-    address_id             BIGINT       NOT NULL,
-    -- address snapshot: filled by trigger from address_id, unaffected by later edits
-    delivery_street_name   TEXT         NOT NULL,
-    delivery_plaque_number TEXT         NOT NULL,
-    delivery_unit_number   TEXT         NOT NULL,
+    address_id             BIGINT,                         -- NULL for pickup-only reservations
+    -- address snapshot: filled by trigger when address_id is set
+    delivery_street_name   TEXT,
+    delivery_plaque_number TEXT,
+    delivery_unit_number   TEXT,
     status                 order_status NOT NULL DEFAULT 'pending_payment',
     idempotency_key        TEXT,
+    idempotency_payload_hash TEXT,
     -- money snapshot (never recomputed from live prices), in Toman
     items_total            BIGINT       NOT NULL,
     service_fee            BIGINT       NOT NULL DEFAULT 0,
@@ -122,10 +123,14 @@ CREATE TRIGGER trg_orders_guard
     BEFORE UPDATE ON orders
     FOR EACH ROW EXECUTE FUNCTION fn_order_status_guard();
 
--- Delivery address: must belong to the buyer; a snapshot is copied into the order.
+-- Delivery address: when provided, must belong to the buyer; a snapshot is copied into the order.
+-- Pickup-only reservations leave address_id NULL.
 CREATE OR REPLACE FUNCTION fn_order_address_snapshot() RETURNS trigger AS $$
 DECLARE a user_addresses%ROWTYPE;
 BEGIN
+    IF NEW.address_id IS NULL THEN
+        RETURN NEW;
+    END IF;
     SELECT * INTO a FROM user_addresses
      WHERE id = NEW.address_id AND user_id = NEW.user_id AND deleted_at IS NULL;
     IF NOT FOUND THEN

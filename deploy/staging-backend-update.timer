@@ -1,0 +1,12 @@
+[Unit]
+Description=Check GHCR for a new develop backend image
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=2min
+RandomizedDelaySec=15s
+Persistent=true
+Unit=staging-backend-update.service
+
+[Install]
+WantedBy=timers.target

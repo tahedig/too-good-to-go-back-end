@@ -29,7 +29,7 @@ func TestInitializeAppProtectsRoutes(t *testing.T) {
 	defer cleanup()
 
 	for path, want := range map[string]int{"/health": http.StatusOK, "/auth/me": http.StatusUnauthorized, "/test/admin": http.StatusUnauthorized, "/orders": http.StatusUnauthorized,
-		"/admin/vendors": http.StatusUnauthorized, "/admin/dashboard": http.StatusUnauthorized} {
+		"/admin/vendors": http.StatusUnauthorized, "/vendor/dashboard": http.StatusUnauthorized, "/admin/dashboard": http.StatusUnauthorized} {
 		w := httptest.NewRecorder()
 		app.Router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
 		if w.Code != want {
@@ -98,5 +98,10 @@ func TestInitializeAppOTPLoginIssuesToken(t *testing.T) {
 	if w := call(http.MethodGet, "/orders", "", session.AccessToken); w.Code != http.StatusOK ||
 		!strings.Contains(w.Body.String(), `"orders":[]`) {
 		t.Fatalf("/orders with login token: %d %s", w.Code, w.Body.String())
+	}
+	// Vendor dashboard is wired (in memory without DATABASE_URL) for vendor tokens.
+	if w := call(http.MethodGet, "/vendor/dashboard", "", session.AccessToken); w.Code != http.StatusOK ||
+		!strings.Contains(w.Body.String(), `"recent_reservations":[]`) {
+		t.Fatalf("/vendor/dashboard with login token: %d %s", w.Code, w.Body.String())
 	}
 }

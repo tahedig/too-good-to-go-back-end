@@ -14,6 +14,7 @@ import (
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/exception"
 	"github.com/tahedig/too-good-to-go/backend/internal/domain/model"
 	handlerinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/handler/interface"
+	"github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware"
 )
 
 type storeHandler struct {
@@ -189,6 +190,9 @@ func getStoreID(c *gin.Context) string {
 }
 
 func storeHandlerUserID(c *gin.Context) (int64, bool) {
+	if id, ok := middleware.UserID(c); ok && id > 0 {
+		return id, true
+	}
 	value, exists := c.Get(bootstrap.CtxKeyUserID)
 	if !exists {
 		return 0, false
