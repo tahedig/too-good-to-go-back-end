@@ -30,9 +30,13 @@ type Handlers struct {
 	Catalogue    handlerinterface.CatalogueHandler
 	UserAuth     middlewareinterface.UserAuth
 	Order        handlerinterface.OrderHandler
+	Reservation  handlerinterface.ReservationHandler
 	Profile      handlerinterface.ProfileHandler
 	// VendorApproval serves the admin panel's store review (/admin/vendors).
 	VendorApproval handlerinterface.VendorApprovalHandler
+	// AdminStore serves the admin panel's store details (/admin/stores).
+	AdminStore           handlerinterface.AdminStoreHandler
+	AdminStoreManagement handlerinterface.AdminStoreManagementHandler
 }
 
 func New(
@@ -87,7 +91,7 @@ func New(
 	auth.POST("/request", h.Auth.RequestOTP)
 	auth.POST("/verify", h.Auth.VerifyOTP)
 
-	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil || h.Profile != nil || h.Order != nil || h.VendorApproval != nil) {
+	if authMW == nil && (h.Protected != nil || h.Store != nil || h.StoreRequest != nil || h.Profile != nil || h.Order != nil || h.Reservation != nil || h.VendorApproval != nil || h.AdminStore != nil || h.AdminStoreManagement != nil) {
 		// Refuse to start rather than serve private routes unauthenticated.
 		return nil, errors.New("router: auth middleware is required for protected routes")
 	}
@@ -118,6 +122,28 @@ func New(
 		vendor.GET("/store-requests/:id", h.StoreRequest.GetStoreRequest)
 		vendor.POST("/store-requests", h.StoreRequest.CreateStoreRequest)
 	}
+	if h.Order != nil {
+		vendor.GET("/store", h.Order.GetVendorStore)
+		vendor.GET("/orders", h.Order.ListVendorOrders)
+		vendor.GET("/orders/summary", h.Order.GetVendorOrderSummary)
+		vendor.GET("/orders/:id", h.Order.GetVendorOrder)
+		vendor.POST("/orders/:id/verify-pickup", h.Order.VerifyPickup)
+		vendor.PATCH("/orders/:id/status", h.Order.UpdateVendorOrderStatus)
+	}
+
+	// Mirror under /api/v1/vendor for frontend api client compatibility.
+	apiV1Vendor := r.Group("/api/v1/vendor")
+	if authMW != nil {
+		apiV1Vendor.Use(authMW.Authenticate(), authMW.RequireRoles(enum.RoleVendor))
+	}
+	if h.Order != nil {
+		apiV1Vendor.GET("/store", h.Order.GetVendorStore)
+		apiV1Vendor.GET("/orders", h.Order.ListVendorOrders)
+		apiV1Vendor.GET("/orders/summary", h.Order.GetVendorOrderSummary)
+		apiV1Vendor.GET("/orders/:id", h.Order.GetVendorOrder)
+		apiV1Vendor.POST("/orders/:id/verify-pickup", h.Order.VerifyPickup)
+		apiV1Vendor.PATCH("/orders/:id/status", h.Order.UpdateVendorOrderStatus)
+	}
 
 	if h.Profile != nil {
 		customer := r.Group("/customer")
@@ -132,15 +158,38 @@ func New(
 		r.GET("/orders", authMW.Authenticate(), h.Order.ListMyOrders)
 	}
 
+	// Customer reservation checkout (TEAM-49).
+	if h.Reservation != nil {
+		reservations := r.Group("/reservations", authMW.Authenticate())
+		reservations.POST("", h.Reservation.CreateReservation)
+	}
+
 	// Admin only: every /admin route needs a valid token with the admin role.
-	if h.VendorApproval != nil {
+	if h.VendorApproval != nil || h.AdminStore != nil || h.AdminStoreManagement != nil {
 		admin := r.Group("/admin", authMW.Authenticate(), authMW.RequireRoles(enum.RoleAdmin))
-		admin.GET("/vendors", h.VendorApproval.ListVendors)
-		admin.GET("/vendors/:id", h.VendorApproval.GetVendor)
-		admin.POST("/vendors/:id/approve", h.VendorApproval.Approve)
-		admin.POST("/vendors/:id/reject", h.VendorApproval.Reject)
-		admin.POST("/vendors/:id/suspend", h.VendorApproval.Suspend)
-		admin.POST("/vendors/:id/reactivate", h.VendorApproval.Reactivate)
+		if h.VendorApproval != nil {
+			admin.GET("/vendors", h.VendorApproval.ListVendors)
+			admin.GET("/vendors/:id", h.VendorApproval.GetVendor)
+			admin.POST("/vendors/:id/approve", h.VendorApproval.Approve)
+			admin.POST("/vendors/:id/reject", h.VendorApproval.Reject)
+			admin.POST("/vendors/:id/suspend", h.VendorApproval.Suspend)
+			admin.POST("/vendors/:id/reactivate", h.VendorApproval.Reactivate)
+		}
+		if h.AdminStoreManagement != nil {
+			admin.GET("/stores", h.AdminStoreManagement.ListStores)
+			admin.GET("/stores/:id", h.AdminStoreManagement.GetManagedStore)
+			admin.PATCH("/stores/:id", h.AdminStoreManagement.UpdateManagedStore)
+		} else if h.AdminStore != nil {
+			admin.GET("/stores/:id", h.AdminStore.GetStore)
+		}
+		if h.AdminStore != nil {
+			admin.PATCH("/stores/:id/status", h.AdminStore.UpdateStoreStatus)
+			admin.GET("/stores/:id/subscription", h.AdminStore.GetSubscription)
+			admin.GET("/stores/:id/offers", h.AdminStore.ListOffers)
+			admin.GET("/offers/:offerId", h.AdminStore.GetOffer)
+			admin.PATCH("/offers/:offerId/status", h.AdminStore.UpdateOfferStatus)
+			admin.GET("/stores/:id/orders", h.AdminStore.ListOrders)
+		}
 	}
 
 	if h.PublicStore != nil {
@@ -148,7 +197,7 @@ func New(
 		r.HEAD("/stores/:id", h.PublicStore.GetPublicStore)
 	}
 
-	registerCatalogue(r, h)
+	registerCatalogue(r, h, authMW)
 
 	return r, nil
 }

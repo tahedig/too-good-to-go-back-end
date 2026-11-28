@@ -5,6 +5,8 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"strings"
 
 	"github.com/google/uuid"
@@ -169,22 +171,22 @@ func (r *catalogueRepository) Search(ctx context.Context, p model.CatalogueSearc
 
 func (r *catalogueRepository) Favorites(ctx context.Context, p model.CatalogueFavoritesSearch) ([]model.CatalogueOffer, error) {
 	ck := cursorArgs(p.Cursor, false)
-	// $1 user, $2 lat, $3 lng, $4 cursor key, $5 cursor id, $6 limit
-	rows, err := r.db.Query(ctx, sqlFavoritesList, p.UserID, p.Lat, p.Lng, ck[0], ck[1], p.Limit)
+	// $1 user public ID, $2 lat, $3 lng, $4 cursor key, $5 cursor id, $6 limit
+	rows, err := r.db.Query(ctx, sqlFavoritesList, p.UserPublicID, p.Lat, p.Lng, ck[0], ck[1], p.Limit)
 	if err != nil {
 		return nil, err
 	}
 	return scanCatalogueOffers(rows)
 }
 
-func (r *catalogueRepository) AddFavorite(ctx context.Context, userID int64, offerPublicID string) (bool, error) {
+func (r *catalogueRepository) AddFavorite(ctx context.Context, userPublicID, offerPublicID string) (bool, error) {
 	var found bool
-	err := r.db.QueryRow(ctx, sqlFavoriteAdd, userID, offerPublicID).Scan(&found)
+	err := r.db.QueryRow(ctx, sqlFavoriteAdd, userPublicID, offerPublicID).Scan(&found)
 	return found, err
 }
 
-func (r *catalogueRepository) RemoveFavorite(ctx context.Context, userID int64, offerPublicID string) error {
-	_, err := r.db.Exec(ctx, sqlFavoriteRemove, userID, offerPublicID)
+func (r *catalogueRepository) RemoveFavorite(ctx context.Context, userPublicID, offerPublicID string) error {
+	_, err := r.db.Exec(ctx, sqlFavoriteRemove, userPublicID, offerPublicID)
 	return err
 }
 
@@ -269,4 +271,79 @@ func (r *catalogueRepository) UserExists(ctx context.Context, userID int64) (boo
 	var ok bool
 	err := r.db.QueryRow(ctx, sqlUserExists, userID).Scan(&ok)
 	return ok, err
+}
+
+// ---------------------------------------------------------------- product details (TEAM-47)
+
+// sqlOfferDetail reads a single offer through the eligible_offers view so
+// publication and availability rules stay identical to the catalogue.
+const sqlOfferDetail = `
+SELECT e.id, e.public_id, e.title, e.description, e.image_url,
+       e.price, e.original_price, e.discount_percent, e.currency,
+       e.quantity_available, e.pickup_start, e.pickup_end,
+       e.category_slug, e.category_name,
+       e.store_public_id, e.store_name, e.store_logo_url,
+       COALESCE(s.city, ''), e.store_district, COALESCE(s.address_line, ''),
+       COALESCE(s.pickup_instructions, ''), e.store_lat, e.store_lng,
+       fn_distance_m($2::float8, $3::float8, e.store_lat, e.store_lng) AS distance_m,
+       EXISTS (SELECT 1 FROM favorite_offers f WHERE f.user_id = $4::bigint AND f.offer_id = e.id) AS is_favorite,
+       COALESCE((
+           SELECT jsonb_agg(jsonb_build_object('code', a.code, 'name_fa', a.name_fa) ORDER BY a.code)
+           FROM offer_allergens oa
+           JOIN allergens a ON a.code = oa.allergen_code
+           WHERE oa.offer_id = e.id
+       ), '[]'::jsonb) AS allergens
+FROM eligible_offers e
+JOIN stores s ON s.id = e.store_id
+WHERE e.public_id = $1::text::uuid`
+
+type offerDetailAllergenRow struct {
+	Code   string `json:"code"`
+	NameFA string `json:"name_fa"`
+}
+
+func (r *catalogueRepository) OfferDetail(
+	ctx context.Context,
+	offerPublicID string,
+	lat, lng *float64,
+	userID *int64,
+) (*model.CatalogueOfferDetail, error) {
+	var (
+		d            model.CatalogueOfferDetail
+		pubID        pgtype.UUID
+		storePubID   pgtype.UUID
+		qty, disc    int32
+		allergensRaw []byte
+	)
+	err := r.db.QueryRow(ctx, sqlOfferDetail, offerPublicID, lat, lng, userID).Scan(
+		&d.ID, &pubID, &d.Title, &d.Description, &d.ImageURL,
+		&d.Price, &d.OriginalPrice, &disc, &d.Currency,
+		&qty, &d.PickupStart, &d.PickupEnd,
+		&d.CategorySlug, &d.CategoryName,
+		&storePubID, &d.StoreName, &d.StoreLogoURL,
+		&d.StoreCity, &d.StoreDistrict, &d.StoreAddressLine,
+		&d.StorePickupInstructions, &d.StoreLat, &d.StoreLng,
+		&d.DistanceM, &d.IsFavorite, &allergensRaw,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	d.PublicID = uuidString(pubID)
+	d.StorePublicID = uuidString(storePubID)
+	d.QuantityAvailable = int(qty)
+	d.DiscountPercent = int(disc)
+	d.Allergens = []model.CatalogueAllergen{}
+	if len(allergensRaw) > 0 {
+		var rows []offerDetailAllergenRow
+		if err := json.Unmarshal(allergensRaw, &rows); err != nil {
+			return nil, err
+		}
+		for _, a := range rows {
+			d.Allergens = append(d.Allergens, model.CatalogueAllergen{Code: a.Code, NameFA: a.NameFA})
+		}
+	}
+	return &d, nil
 }

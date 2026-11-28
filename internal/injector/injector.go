@@ -22,6 +22,7 @@ import (
 	redisrepo "github.com/tahedig/too-good-to-go/backend/internal/infrastructure/repository/redis"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/sms"
 	"github.com/tahedig/too-good-to-go/backend/internal/infrastructure/token"
+	"github.com/tahedig/too-good-to-go/backend/internal/presentation/handler"
 	handlerinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/handler/interface"
 	middlewareinterface "github.com/tahedig/too-good-to-go/backend/internal/presentation/middleware/interface"
 	"github.com/tahedig/too-good-to-go/backend/internal/presentation/router"
@@ -116,11 +117,14 @@ func provideAuthService(
 // database is everything that moves from memory to PostgreSQL when
 // DATABASE_URL is set.
 type database struct {
-	users    repository.UserRepository
-	orders   repository.OrderRepository
-	vendors  repository.VendorApprovalRepository
-	pool     *pgxpool.Pool
-	checkers []serviceinterface.HealthChecker
+	users           repository.UserRepository
+	orders          repository.OrderRepository
+	reservations    repository.ReservationRepository
+	vendors         repository.VendorApprovalRepository
+	adminStores     repository.AdminStoreRepository
+	storeManagement repository.AdminStoreManagementRepository
+	pool            *pgxpool.Pool
+	checkers        []serviceinterface.HealthChecker
 }
 
 const dbConnectTimeout = 5 * time.Second
@@ -132,8 +136,14 @@ const dbConnectTimeout = 5 * time.Second
 func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func(), error) {
 	if cfg.DatabaseURL == "" {
 		log.Warn("DATABASE_URL is not set: users and orders are kept in memory, are lost on restart and are not shared between instances")
-		return &database{users: memory.NewUserRepository(), orders: memory.NewOrderRepository(),
-			vendors: memory.NewVendorApprovalRepository()}, func() {}, nil
+		memOrders := memory.NewOrderRepository()
+		return &database{
+			users:        memory.NewUserRepository(),
+			orders:       memOrders,
+			reservations: memory.NewReservationRepository(memOrders),
+			vendors:      memory.NewVendorApprovalRepository(),
+			adminStores:  memory.NewAdminStoreRepository(),
+		}, func() {}, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbConnectTimeout)
@@ -150,9 +160,14 @@ func provideDatabase(cfg *bootstrap.Config, log *slog.Logger) (*database, func()
 	log.Info("connected to postgres", "host", connCfg.Host, "port", connCfg.Port, "database", connCfg.Database)
 
 	return &database{
-		users:    postgres.NewUserRepository(pool),
-		orders:   postgres.NewOrderRepository(pool),
-		checkers: []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
+		users:           postgres.NewUserRepository(pool),
+		orders:          postgres.NewOrderRepository(pool),
+		reservations:    postgres.NewReservationRepository(pool),
+		vendors:         postgres.NewVendorApprovalRepository(pool),
+		adminStores:     postgres.NewAdminStoreRepository(pool),
+		storeManagement: postgres.NewAdminStoreManagementRepository(pool),
+		pool:            pool,
+		checkers:        []serviceinterface.HealthChecker{driver.NewHealthChecker(pool)},
 	}, pool.Close, nil
 }
 
@@ -160,8 +175,34 @@ func provideUserRepository(db *database) repository.UserRepository { return db.u
 
 func provideOrderRepository(db *database) repository.OrderRepository { return db.orders }
 
+func provideReservationRepository(db *database) repository.ReservationRepository {
+	return db.reservations
+}
+
 func provideVendorApprovalRepository(db *database) repository.VendorApprovalRepository {
 	return db.vendors
+}
+
+func provideAdminStoreRepository(db *database) repository.AdminStoreRepository {
+	return db.adminStores
+}
+
+func provideAdminStoreManagementRepository(db *database) repository.AdminStoreManagementRepository {
+	return db.storeManagement
+}
+
+func provideAdminStoreManagementService(repo repository.AdminStoreManagementRepository) serviceinterface.AdminStoreManagementService {
+	if repo == nil {
+		return nil
+	}
+	return service.NewAdminStoreManagementService(repo)
+}
+
+func provideAdminStoreManagementHandler(svc serviceinterface.AdminStoreManagementService) handlerinterface.AdminStoreManagementHandler {
+	if svc == nil {
+		return nil
+	}
+	return handler.NewAdminStoreManagementHandler(svc)
 }
 
 // providePhoneRoles maps ADMIN_PHONES / VENDOR_PHONES to the role a new user
@@ -198,16 +239,22 @@ func provideHandlers(
 	protected handlerinterface.ProtectedHandler,
 	profile handlerinterface.ProfileHandler,
 	order handlerinterface.OrderHandler,
+	reservation handlerinterface.ReservationHandler,
 	vendorApproval handlerinterface.VendorApprovalHandler,
+	adminStore handlerinterface.AdminStoreHandler,
+	adminStoreManagement handlerinterface.AdminStoreManagementHandler,
 ) router.Handlers {
 	return router.Handlers{
-		Health:         health,
-		Auth:           auth,
-		Catalogue:      catalogue,
-		UserAuth:       userAuth,
-		Protected:      protected,
-		Profile:        profile,
-		Order:          order,
-		VendorApproval: vendorApproval,
+		Health:               health,
+		Auth:                 auth,
+		Catalogue:            catalogue,
+		UserAuth:             userAuth,
+		Protected:            protected,
+		Profile:              profile,
+		Order:                order,
+		Reservation:          reservation,
+		VendorApproval:       vendorApproval,
+		AdminStore:           adminStore,
+		AdminStoreManagement: adminStoreManagement,
 	}
 }

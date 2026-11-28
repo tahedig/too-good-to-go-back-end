@@ -101,19 +101,20 @@ func TestCatalogueRepositorySmoke(t *testing.T) {
 	})
 
 	t.Run("favorites", func(t *testing.T) {
-		if _, err := repo.Favorites(ctx, model.CatalogueFavoritesSearch{UserID: user, Limit: 11}); err != nil {
+		const userPublicID = "550e8400-e29b-41d4-a716-446655440000"
+		if _, err := repo.Favorites(ctx, model.CatalogueFavoritesSearch{UserPublicID: userPublicID, Limit: 11}); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := repo.Favorites(ctx, model.CatalogueFavoritesSearch{
-			UserID: user, Lat: &lat, Lng: &lng, Cursor: &model.CatalogueCursor{K1: 0, ID: 0}, Limit: 11,
+			UserPublicID: userPublicID, Lat: &lat, Lng: &lng, Cursor: &model.CatalogueCursor{K1: 0, ID: 0}, Limit: 11,
 		}); err != nil {
 			t.Fatal(err)
 		}
-		found, err := repo.AddFavorite(ctx, user, someUUID) // unknown offer: must be (false, nil)
+		found, err := repo.AddFavorite(ctx, userPublicID, someUUID) // unknown offer: must be (false, nil)
 		if err != nil || found {
 			t.Fatalf("unknown offer: found=%v err=%v", found, err)
 		}
-		if err := repo.RemoveFavorite(ctx, user, someUUID); err != nil {
+		if err := repo.RemoveFavorite(ctx, userPublicID, someUUID); err != nil {
 			t.Fatal(err)
 		}
 	})

@@ -101,7 +101,7 @@ FROM (
     SELECT e.*, (-(extract(epoch FROM f.created_at) * 1000000))::bigint AS sort_key
     FROM favorite_offers f
     JOIN eligible_offers e ON e.id = f.offer_id
-    WHERE f.user_id = $1::bigint
+    WHERE f.user_id = (SELECT id FROM users WHERE public_id = $1::uuid)
 ) k
 WHERE ($4::bigint IS NULL OR (k.sort_key, k.id) > ($4::bigint, $5::bigint))
 ORDER BY k.sort_key, k.id
@@ -109,10 +109,12 @@ LIMIT $6::int`
 
 // favorite_add (from catalogue_extra.sql)
 const sqlFavoriteAdd = `WITH target AS (
-    SELECT id FROM eligible_offers WHERE public_id = $2::text::uuid
+    SELECT u.id AS user_id, e.id AS offer_id
+    FROM users u CROSS JOIN eligible_offers e
+    WHERE u.public_id = $1::uuid AND e.public_id = $2::text::uuid
 ), ins AS (
     INSERT INTO favorite_offers (user_id, offer_id)
-    SELECT $1::bigint, id FROM target
+    SELECT user_id, offer_id FROM target
     ON CONFLICT DO NOTHING
     RETURNING 1
 )
@@ -120,7 +122,8 @@ SELECT EXISTS (SELECT 1 FROM target)`
 
 // favorite_remove (from catalogue_extra.sql)
 const sqlFavoriteRemove = `DELETE FROM favorite_offers f USING offers o
-WHERE f.offer_id = o.id AND f.user_id = $1::bigint AND o.public_id = $2::text::uuid`
+WHERE f.offer_id = o.id AND o.public_id = $2::text::uuid
+  AND f.user_id = (SELECT id FROM users WHERE public_id = $1::uuid)`
 
 // filter_allergens (from catalogue_extra.sql)
 const sqlFilterAllergens = `SELECT code, name_fa FROM allergens ORDER BY code`
