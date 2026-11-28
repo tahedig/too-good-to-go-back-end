@@ -419,10 +419,45 @@ log with it from any layer:
 logger.FromContext(ctx, s.log).Info("offer reserved", "offer_id", id)
 ```
 
+## Seed & Demo Data
+
+The repository includes an idempotent seeder (`cmd/seed`) for local development and staging validation. It refuses to run when `APP_ENV=production`.
+
+What it seeds:
+- **Demo accounts:** 1 `admin`, 2 `vendor_owner`, and 2 `customer` accounts (with default customer addresses).
+- **Stores:** 6 stores across multiple categories (`5` `approved` + `1` `pending` for admin review), with working hours, primary images, and approval history.
+- **Offers:** 22 offers across approved stores (`active`, `sold_out`, `expired`, `inactive`), varied prices/discounts, quantities, and allergens.
+- **Reservations (orders):** 22 orders covering `pending_payment`, `paid`, `ready`, `completed`, `cancelled` (by customer, vendor, and admin), `expired`, and `no_show`, along with `order_items`, `order_status_history`, and `payments`.
+
+### Running the seeder
+
+1. Apply migrations first:
+   ```bash
+   make migrate-up DB_URL="postgres://app:app@localhost:5432/tgtg?sslmode=disable"
+   ```
+2. Configure environment variables in `.env` (never commit `.env` or real phone numbers):
+   - `DATABASE_URL` (required)
+   - `SEED_ADMIN_PHONE`, `SEED_VENDOR_PHONES`, `SEED_CUSTOMER_PHONES` (comma-separated; required in `staging`, optional in `development` where synthetic `+989000000001`–`+989000000005` defaults are used).
+3. Run the seeder (safe to re-run repeatedly without creating duplicates):
+   ```bash
+   make seed
+   # or: go run ./cmd/seed
+   # or with Docker Compose:
+   docker compose --profile seed run --rm seed
+   ```
+
+### Accessing demo accounts safely
+
+Authentication is passwordless OTP + JWT. In local development and staging (never production), set `OTP_EXPOSE_CODE=true` in `.env` so `POST /auth/otp/request` returns `debug_code`:
+
+1. Request an OTP for a configured demo phone (`POST /auth/otp/request` with `{"phone": "<demo_phone>"}`).
+2. Verify using the returned `debug_code` (`POST /auth/otp/verify` with `{"phone": "<demo_phone>", "code": "<debug_code>"}`) to obtain a role-scoped `access_token`.
+
 ## Project layout
 
 ```
 cmd/api/                  entrypoint: config, logger, server, graceful shutdown
+cmd/seed/                 idempotent dev/staging database seeder
 internal/
   bootstrap/              env config and constants
   domain/                 models, enums, repository interfaces, typed exceptions

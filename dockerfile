@@ -4,7 +4,6 @@ WORKDIR /app
 
 COPY go.mod go.sum ./
 RUN go mod download
-
 COPY . .
 
 ARG APP_VERSION=dev
@@ -12,7 +11,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
     -ldflags="-s -w -X main.version=${APP_VERSION}" \
     -o /bin/api \
-    ./cmd/api
+    ./cmd/api \
+    && CGO_ENABLED=0 GOOS=linux go build \
+    -trimpath \
+    -o /bin/seed \
+    ./cmd/seed
 
 FROM migrate/migrate:v4.20.1 AS migration
 
@@ -23,6 +26,7 @@ RUN apk add --no-cache ca-certificates \
     && adduser -S -G app app
 
 COPY --from=build /bin/api /bin/api
+COPY --from=build /bin/seed /bin/seed
 COPY --from=migration /usr/local/bin/migrate /usr/local/bin/migrate
 COPY --chown=app:app migrations /migrations
 
