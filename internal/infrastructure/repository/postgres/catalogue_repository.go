@@ -280,13 +280,14 @@ func (r *catalogueRepository) UserExists(ctx context.Context, userID int64) (boo
 const sqlOfferDetail = `
 SELECT e.id, e.public_id, e.title, e.description, e.image_url,
        e.price, e.original_price, e.discount_percent, e.currency,
-       e.quantity_available, e.pickup_start, e.pickup_end,
+       e.quantity_available, e.pickup_start, e.pickup_end, e.cancellation_deadline,
        e.category_slug, e.category_name,
        e.store_public_id, e.store_name, e.store_logo_url,
        COALESCE(s.city, ''), e.store_district, COALESCE(s.address_line, ''),
        COALESCE(s.pickup_instructions, ''), e.store_lat, e.store_lng,
        fn_distance_m($2::float8, $3::float8, e.store_lat, e.store_lng) AS distance_m,
        EXISTS (SELECT 1 FROM favorite_offers f WHERE f.user_id = $4::bigint AND f.offer_id = e.id) AS is_favorite,
+       o.allergens_declared,
        COALESCE((
            SELECT jsonb_agg(jsonb_build_object('code', a.code, 'name_fa', a.name_fa) ORDER BY a.code)
            FROM offer_allergens oa
@@ -294,6 +295,7 @@ SELECT e.id, e.public_id, e.title, e.description, e.image_url,
            WHERE oa.offer_id = e.id
        ), '[]'::jsonb) AS allergens
 FROM eligible_offers e
+JOIN offers o ON o.id = e.id
 JOIN stores s ON s.id = e.store_id
 WHERE e.public_id = $1::text::uuid`
 
@@ -318,12 +320,12 @@ func (r *catalogueRepository) OfferDetail(
 	err := r.db.QueryRow(ctx, sqlOfferDetail, offerPublicID, lat, lng, userID).Scan(
 		&d.ID, &pubID, &d.Title, &d.Description, &d.ImageURL,
 		&d.Price, &d.OriginalPrice, &disc, &d.Currency,
-		&qty, &d.PickupStart, &d.PickupEnd,
+		&qty, &d.PickupStart, &d.PickupEnd, &d.CancellationDeadline,
 		&d.CategorySlug, &d.CategoryName,
 		&storePubID, &d.StoreName, &d.StoreLogoURL,
 		&d.StoreCity, &d.StoreDistrict, &d.StoreAddressLine,
 		&d.StorePickupInstructions, &d.StoreLat, &d.StoreLng,
-		&d.DistanceM, &d.IsFavorite, &allergensRaw,
+		&d.DistanceM, &d.IsFavorite, &d.AllergensDeclared, &allergensRaw,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
